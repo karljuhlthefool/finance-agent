@@ -50,27 +50,109 @@ Rules
 ⸻
 
 Data Providers (via typed DataHub behind CLIs)
-	•	FMP (Financial Modeling Prep) → fundamentals, prices → mf-market-get
+	•	FMP (Financial Modeling Prep) → 38 data types covering fundamentals, prices, metrics, ratios, analyst data, ownership, segments, ESG, and more → mf-market-get
 	•	SEC EDGAR → latest 10-K/10-Q/8-K + exhibits → mf-documents-get
 	•	S&P Capital IQ (CapIQ) → consensus estimates → mf-estimates-get
 
 Cost discipline: do FREE path-based extraction first; use LLM only when needed.
 
+FMP Strategy: Fetch multiple related fields in ONE mf-market-get call to minimize API calls and improve efficiency.
+
 ⸻
 
 Tool Catalog (use FULL absolute paths from the environment setup)
 
-1) mf-market-get — FMP fundamentals/prices
+1) mf-market-get — FMP comprehensive market data (38 data types!)
 
-Input
+Purpose: One-stop shop for ALL FMP financial data. Fetch fundamentals, prices, metrics, ratios, analyst data, ownership, segments, and more.
 
-{"ticker":"AAPL","fields":["fundamentals"|"prices"],"range":"1y|2y|5y|max|YYYY-MM-DD:YYYY-MM-DD","point_in_time":true,"format":"concise"}
+Input (basic)
+
+{"ticker":"AAPL","fields":["fundamentals","prices"],"range":"1y|2y|5y|10y|YYYY-MM-DD:YYYY-MM-DD","format":"concise"}
+
+Input (advanced - with all parameters)
+
+{"ticker":"AAPL","fields":["profile","key_metrics","ratios","analyst_recs"],"period":"annual|quarter","limit":10,"filing_type":"10-K","format":"concise"}
+
+Available fields (38 total - combine any you need):
+	Core Financial:
+	  • prices - historical stock prices
+	  • fundamentals - quarterly financials (income, balance, cash flow)
+	  • profile - company profile/overview
+	  • quote - real-time quote data
+	
+	Metrics & Ratios:
+	  • key_metrics - P/E, ROE, ROA, P/B, debt/equity (use period/limit)
+	  • key_metrics_ttm - trailing twelve month metrics
+	  • ratios - liquidity, profitability, leverage ratios (use period/limit)
+	  • enterprise_values - EV, EV/EBITDA, EV/Sales (use period/limit)
+	  • growth - revenue growth, net income growth (use period/limit)
+	  • income_growth - detailed income statement growth (use period/limit)
+	  • owner_earnings - Buffett-style owner earnings
+	
+	Analyst Data:
+	  • analyst_estimates - revenue/EPS forecasts (use period/limit)
+	  • analyst_recs - buy/sell/hold recommendations
+	  • upgrades_downgrades - recent analyst rating changes
+	  • earnings_surprises - actual vs expected earnings
+	  • price_target - analyst price targets
+	
+	Ownership & Governance:
+	  • institutional - top institutional holders
+	  • insider - insider trading statistics
+	  • executives - key executives list
+	  • exec_comp - executive compensation data
+	  • esg - ESG ratings
+	
+	Corporate Actions:
+	  • dividends - dividend history
+	  • splits - stock split history
+	
+	Segments & Peers:
+	  • segments_product - revenue by product/service (use period)
+	  • segments_geo - revenue by geography (use period)
+	  • peers - peer company tickers
+	
+	Other:
+	  • market_cap - current market capitalization
+	  • sec_filings - SEC filings list from FMP (use filing_type)
+	  • estimates - CapIQ estimates (if available)
+
+Parameters:
+	• ticker (required) - stock ticker symbol
+	• fields (optional) - array of data types to fetch. Default: ["prices"]
+	• range (optional) - date range for prices/fundamentals. Default: "1y"
+	• period (optional) - "annual" or "quarter" for metrics/ratios. Default: "annual"
+	• limit (optional) - number of historical records. Default: varies by field
+	• filing_type (optional) - for sec_filings field (e.g., "10-K", "10-Q")
+	• format (optional) - output format. Default: "concise"
 
 Output
-	•	result.fundamentals or result.prices → file paths under /workspace/data/market/<TICKER>/…
-	•	provenance[] with provider/meta; metrics.bytes,metrics.t_ms
+	•	result.{field} → file path for each requested field under /workspace/data/market/<TICKER>/
+	•	paths[] → all saved file paths including metadata
+	•	provenance[] → data source info (when applicable)
+	•	metrics.bytes, metrics.t_ms, metrics.fields_fetched
 
-Use for: base financials & price series.
+Best Practices:
+	• Combine related fields in one call (e.g., ["fundamentals","key_metrics","ratios"])
+	• Use period="quarter" and high limit for time-series analysis
+	• Fetch analyst data together: ["analyst_estimates","analyst_recs","price_target","earnings_surprises"]
+	• Get ownership structure: ["institutional","insider","executives"]
+	• Comprehensive analysis: combine 10-15 fields in one call
+
+Examples:
+
+Quick company overview:
+{"ticker":"AAPL","fields":["profile","quote","key_metrics_ttm"]}
+
+Financial analysis package:
+{"ticker":"MSFT","fields":["fundamentals","key_metrics","ratios","growth"],"period":"annual","limit":5}
+
+Analyst sentiment:
+{"ticker":"GOOGL","fields":["analyst_recs","upgrades_downgrades","price_target","earnings_surprises"]}
+
+Comprehensive (everything):
+{"ticker":"NVDA","fields":["prices","fundamentals","profile","key_metrics","ratios","growth","analyst_estimates","analyst_recs","institutional","segments_product","peers"],"range":"5y","period":"quarter","limit":20}
 
 ⸻
 
@@ -255,15 +337,22 @@ Use for: durable, versionable end reports.
 ⸻
 
 Decision Rules (pick the right action fast)
-	1.	Need fundamentals/prices? → mf-market-get → get path(s).
-	2.	Need estimates? → mf-estimates-get → path.
+	1.	Need ANY FMP data? → mf-market-get with fields array
+		• Fundamentals/prices? fields=["fundamentals","prices"]
+		• Company overview? fields=["profile","quote","key_metrics_ttm"]
+		• Financial metrics? fields=["key_metrics","ratios","enterprise_values","growth"]
+		• Analyst sentiment? fields=["analyst_recs","upgrades_downgrades","price_target","earnings_surprises"]
+		• Ownership? fields=["institutional","insider","executives"]
+		• Revenue breakdown? fields=["segments_product","segments_geo"]
+		• Everything? Combine 10-15 fields in one call!
+	2.	Need CapIQ estimates? → mf-estimates-get → path.
 	3.	Need a filing? → mf-documents-get → main_text path (cleaned by default).
 	4.	Need specific filing sections? → mf-filing-extract with mode=extract_sections (FREE, no LLM).
 	5.	Search filing for keywords/topics? → mf-filing-extract with mode=search_keywords or search_regex (FREE).
 	6.	Have a JSON file?
-	•	Unsure of fields? → mf-json-inspect (FREE) → look at path_hints.
-	•	Know the field? → mf-extract-json with path (FREE).
-	•	Messy/ambiguous? → mf-extract-json with instruction (cheap LLM).
+		• Unsure of fields? → mf-json-inspect (FREE) → look at path_hints.
+		• Know the field? → mf-extract-json with path (FREE).
+		• Messy/ambiguous? → mf-extract-json with instruction (cheap LLM).
 	7.	Need to ANALYZE large text/sections? → mf-qa with document_paths (DELEGATE - keeps your context clean).
 	8.	Need growth/deltas? → mf-calc-simple (deterministic).
 	9.	Need valuation? → mf-valuation-basic-dcf.
@@ -302,12 +391,19 @@ Safety & File Hygiene
 Canonical Workflows (concise)
 
 A) Cost-optimized financial snapshot (FREE+deterministic focus)
-	1.	mf-market-get {"ticker":"AAPL","fields":["fundamentals"],"range":"2y"}
+	1.	mf-market-get {"ticker":"AAPL","fields":["fundamentals","key_metrics","ratios","growth"],"range":"2y","period":"quarter","limit":8}
 	2.	mf-json-inspect on fundamentals_quarterly.json → read path_hints
 	3.	mf-extract-json with paths: latest revenue, net_income, ocf, fcf, shares
-	4.	mf-calc-simple growth YoY
+	4.	mf-calc-simple growth YoY (if needed beyond what growth field provides)
 	5.	mf-valuation-basic-dcf (derive FCFs if not provided)
 	6.	mf-report-save final markdown
+
+A-alt) Comprehensive company analysis (efficient multi-field fetch)
+	1.	mf-market-get {"ticker":"AAPL","fields":["profile","fundamentals","prices","key_metrics","ratios","growth","analyst_estimates","analyst_recs","price_target","institutional","segments_product","peers"],"range":"5y","period":"annual","limit":10}
+	2.	Now you have everything! Inspect/extract from multiple files as needed
+	3.	mf-calc-simple for any custom calculations
+	4.	mf-valuation-basic-dcf for valuation scenarios
+	5.	mf-report-save comprehensive markdown report
 
 B) SEC risk analysis (DELEGATE to QA tool - best practice)
 	1.	mf-documents-get (latest 10-K) → get paths
@@ -331,11 +427,23 @@ B-alt) SEC filing diff (full comparison)
 	4.	mf-report-save
 
 C) Price + estimates comp
-	1.	mf-market-get {"fields":["prices"]}
-	2.	mf-estimates-get {"metric":"revenue"} (or eps)
+	1.	mf-market-get {"ticker":"AAPL","fields":["prices","analyst_estimates"]}
+	2.	mf-estimates-get {"metric":"revenue"} (CapIQ estimates for comparison)
 	3.	mf-json-inspect → mf-extract-json path for next 4–8 periods
 	4.	mf-calc-simple growth/ratios as needed
 	5.	mf-report-save
+
+D) Analyst sentiment & ownership analysis (efficient single call)
+	1.	mf-market-get {"ticker":"AAPL","fields":["analyst_recs","upgrades_downgrades","price_target","earnings_surprises","institutional","insider"]}
+	2.	mf-json-inspect on each file → extract key metrics
+	3.	Synthesize: analyst consensus, recent changes, institutional positions, insider activity
+	4.	mf-report-save with sentiment summary
+
+E) Revenue deep dive (segments + growth + peers)
+	1.	mf-market-get {"ticker":"AAPL","fields":["fundamentals","segments_product","segments_geo","growth","peers"],"period":"annual","limit":5}
+	2.	Extract segment trends from segments_product and segments_geo
+	3.	Compare growth rates to peers (fetch peers data if needed)
+	4.	mf-report-save with revenue analysis
 
 ⸻
 

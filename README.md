@@ -40,6 +40,20 @@ chmod +x src/agent.py
 python src/agent.py
 ```
 
+### 4. Start the FastAPI streaming service (optional, for UI)
+
+```bash
+uvicorn agent_service.app:app --reload --port 5051
+```
+
+### 5. Launch the Next.js frontend (optional)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 ---
 
 ## 📦 What's Included
@@ -59,6 +73,13 @@ python src/agent.py
 - **`src/agent.py`** - Main agent using Claude Agent SDK
 - **`src/hooks.py`** - Security guardrails
 - **`src/prompts/agent_system.py`** - System prompt
+
+### FastAPI + Generative UI
+
+- **`agent_service/app.py`** – FastAPI bridge exposing `/query` and `/healthz` for streaming chat + tool activity as NDJSON.
+- **`agent_service/tools_cli.py`** – Wraps finance CLIs as in-process MCP tools so the SDK can call them with typed inputs.
+- **`agent_service/hooks.py`** – Reuses CLI guardrails for API usage and normalizes tool payloads for the UI cards.
+- **`frontend/`** – Next.js App Router UI powered by Vercel AI SDK; see `app/page.tsx` for the chat surface and `components/cards/` for generative tool visualizations.
 
 ---
 
