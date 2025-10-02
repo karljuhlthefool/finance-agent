@@ -2,7 +2,7 @@
 from __future__ import annotations
 import os
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError
@@ -168,5 +168,190 @@ class FmpProvider:
                 meta={"endpoint": "historical-price-full"},
             ),
         )
+
+    # ---- Company Information ----
+
+    def get_company_profile(self, ticker: str) -> Dict[str, Any]:
+        """Fetch company profile/overview."""
+        url = f"{self.base_url}/profile/{ticker}?apikey={self.api_key}"
+        data = self._get_json(url)
+        return data[0] if isinstance(data, list) and data else data
+
+    def get_key_executives(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch key executives."""
+        url = f"{self.base_url}/key-executives/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_market_capitalization(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch current market cap."""
+        url = f"{self.base_url}/market-capitalization/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- Financial Metrics ----
+
+    def get_key_metrics(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch key financial metrics."""
+        url = f"{self.base_url}/key-metrics/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_key_metrics_ttm(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch trailing twelve month metrics."""
+        url = f"{self.base_url}/key-metrics-ttm/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_financial_ratios(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch financial ratios."""
+        url = f"{self.base_url}/ratios/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_enterprise_values(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch enterprise value data."""
+        url = f"{self.base_url}/enterprise-values/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_financial_growth(
+        self, ticker: str, period: str = "annual", limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Fetch financial growth metrics (revenue growth, net income growth, etc)."""
+        url = f"{self.base_url}/financial-growth/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_income_statement_growth(
+        self, ticker: str, period: str = "annual", limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Fetch detailed income statement growth rates."""
+        url = f"{self.base_url}/income-statement-growth/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_owner_earnings(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch owner earnings (Buffett-style metric)."""
+        url = f"https://fmpcloud.io/api/v4/owner_earnings?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- Analyst & Market Data ----
+
+    def get_analyst_estimates(self, ticker: str, period: str = "annual", limit: int = 10) -> List[Dict[str, Any]]:
+        """Fetch analyst estimates for revenue, EPS, etc."""
+        url = f"{self.base_url}/analyst-estimates/{ticker}?period={period}&limit={limit}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_analyst_recommendations(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst buy/sell/hold recommendations."""
+        url = f"{self.base_url}/analyst-stock-recommendations/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_upgrades_downgrades(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst upgrades and downgrades."""
+        url = f"https://fmpcloud.io/api/v4/upgrades-downgrades?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_earnings_surprises(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch historical earnings surprises."""
+        url = f"{self.base_url}/earnings-surprises/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_price_target(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst price targets."""
+        url = f"https://fmpcloud.io/api/v4/price-target?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_stock_peers(self, ticker: str) -> List[str]:
+        """Fetch peer companies."""
+        url = f"https://fmpcloud.io/api/v4/stock_peers?symbol={ticker}&apikey={self.api_key}"
+        data = self._get_json(url)
+        return data[0].get("peersList", []) if isinstance(data, list) and data else []
+
+    # ---- Ownership & Insider Data ----
+
+    def get_institutional_ownership(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch institutional ownership."""
+        url = f"https://fmpcloud.io/api/v4/institutional-ownership/symbol-ownership?symbol={ticker}&includeCurrentQuarter=false&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_insider_trading(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch insider trading statistics."""
+        url = f"https://fmpcloud.io/api/v4/insider-roaster-statistic?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- Dividends & Stock Events ----
+
+    def get_dividends(self, ticker: str) -> Dict[str, Any]:
+        """Fetch dividend history."""
+        url = f"{self.base_url}/historical-price-full/stock_dividend/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_stock_splits(self, ticker: str) -> Dict[str, Any]:
+        """Fetch stock split history."""
+        url = f"{self.base_url}/historical-price-full/stock_split/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- Segment Data ----
+
+    def get_revenue_segments_by_product(self, ticker: str, period: str = "annual") -> List[Dict[str, Any]]:
+        """Fetch revenue segmentation by product/service."""
+        url = f"https://fmpcloud.io/api/v4/revenue-product-segmentation?symbol={ticker}&structure=flat&period={period}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_revenue_segments_by_geography(self, ticker: str, period: str = "annual") -> List[Dict[str, Any]]:
+        """Fetch revenue segmentation by geography."""
+        url = f"https://fmpcloud.io/api/v4/revenue-geographic-segmentation?symbol={ticker}&structure=flat&period={period}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- SEC Filings ----
+
+    def get_sec_filings(self, ticker: str, filing_type: Optional[str] = None, page: int = 0) -> List[Dict[str, Any]]:
+        """Fetch SEC filings list."""
+        url = f"{self.base_url}/sec_filings/{ticker}?page={page}&apikey={self.api_key}"
+        if filing_type:
+            url += f"&type={filing_type}"
+        return self._get_json(url)
+
+    # ---- ESG & Governance ----
+
+    def get_esg_ratings(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch ESG ratings."""
+        url = f"https://fmpcloud.io/api/v4/esg-environmental-social-governance-data-ratings?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_executive_compensation(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch executive compensation data."""
+        url = f"https://fmpcloud.io/api/v4/governance/executive_compensation?symbol={ticker}&apikey={self.api_key}"
+        return self._get_json(url)
+
+    # ---- Market Overview ----
+
+    def get_quote(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch real-time quote data."""
+        url = f"{self.base_url}/quote/{ticker}?apikey={self.api_key}"
+        return self._get_json(url)
+
+    def get_stock_screener(
+        self,
+        market_cap_min: Optional[int] = None,
+        market_cap_max: Optional[int] = None,
+        sector: Optional[str] = None,
+        industry: Optional[str] = None,
+        exchange: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Screen stocks by various criteria."""
+        url = f"{self.base_url}/stock-screener?limit={limit}&apikey={self.api_key}"
+        if market_cap_min:
+            url += f"&marketCapMoreThan={market_cap_min}"
+        if market_cap_max:
+            url += f"&marketCapLowerThan={market_cap_max}"
+        if sector:
+            url += f"&sector={sector}"
+        if industry:
+            url += f"&industry={industry}"
+        if exchange:
+            url += f"&exchange={exchange}"
+        return self._get_json(url)
 
 

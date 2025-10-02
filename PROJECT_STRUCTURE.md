@@ -64,7 +64,7 @@ Run locally via `uvicorn agent_service.app:app --reload --port 5051` (ensure you
 - **`components/cards/`** – Generative UI cards (`ReportCard`, `LogsCard`, `GenericToolCard`) that parse the normalized `{ok,data,error}` envelopes emitted by the backend.
 - **Configuration** – `package.json`, `tsconfig.json`, `next.config.mjs`, and `app/globals.css` define tooling, build targets, and styling. Set `AGENT_URL`/`ANTHROPIC_MODEL` env vars for dev/prod.
 
-Run with `pnpm install` then `pnpm dev` from `frontend/`, ensuring the FastAPI agent is reachable at the configured `AGENT_URL`.
+Install dependencies in `frontend/` with your preferred package manager (`pnpm install` or `npm install`) and start the dev server via `pnpm dev` or `npm run dev`, ensuring the FastAPI agent is reachable at the configured `AGENT_URL`.
 
 ## DataHub and Provider Layer
 

@@ -32,6 +32,10 @@ html, body {
   scroll-behavior: smooth;
 }
 
+a {
+  color: inherit;
+}
+
 * {
   box-sizing: border-box;
 }

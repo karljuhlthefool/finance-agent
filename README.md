@@ -50,8 +50,8 @@ uvicorn agent_service.app:app --reload --port 5051
 
 ```bash
 cd frontend
-pnpm install
-pnpm dev
+pnpm install   # or: npm install
+pnpm dev       # or: npm run dev
 ```
 
 ---

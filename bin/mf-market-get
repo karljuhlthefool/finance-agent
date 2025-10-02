@@ -1,7 +1,89 @@
 #!/usr/bin/env python3
 """
-Fetch market data: prices, fundamentals, estimates.
+Fetch market data: prices, fundamentals, estimates, ratios, analyst data, and more.
 REFACTORED: Now uses DataHub for typed, validated responses.
+Supports extensive FMP data endpoints through flexible 'fields' argument.
+
+USAGE:
+  echo '{"ticker": "AAPL", "fields": ["prices", "fundamentals"]}' | ./mf-market-get
+
+ARGUMENTS (JSON via stdin):
+  ticker (required): Stock ticker symbol (e.g., "AAPL")
+  fields (optional): List of data types to fetch. Default: ["prices"]
+  range (optional): Date range for prices/fundamentals. Default: "1y"
+                    Options: "1y", "2y", "5y", "10y", or "YYYY-MM-DD:YYYY-MM-DD"
+  period (optional): Period for metrics/ratios. Default: "annual"
+                     Options: "annual", "quarter"
+  limit (optional): Number of historical records. Default: varies by field
+  filing_type (optional): For 'sec_filings' field. E.g., "10-K", "10-Q"
+  format (optional): Output format. Default: "concise"
+
+AVAILABLE FIELDS:
+  Core Financial:
+    - prices: Historical stock prices
+    - fundamentals: Quarterly financial statements (income, balance, cash flow)
+    - profile: Company profile/overview
+    - quote: Real-time quote data
+  
+  Metrics & Ratios:
+    - key_metrics: Key financial metrics (P/E, ROE, ROA, etc)
+    - key_metrics_ttm: Trailing twelve month metrics
+    - ratios: Financial ratios (liquidity, profitability, leverage, etc)
+    - enterprise_values: Enterprise value calculations
+    - growth: Revenue growth, net income growth, etc
+    - income_growth: Detailed income statement growth rates
+    - owner_earnings: Buffett-style owner earnings
+  
+  Analyst Data:
+    - analyst_estimates: Revenue and EPS forecasts
+    - analyst_recs: Buy/sell/hold recommendations
+    - upgrades_downgrades: Recent analyst rating changes
+    - earnings_surprises: Historical earnings surprises
+    - price_target: Analyst price targets
+  
+  Ownership & Governance:
+    - institutional: Institutional ownership data
+    - insider: Insider trading statistics
+    - executives: Key executives
+    - exec_comp: Executive compensation
+    - esg: ESG ratings
+  
+  Corporate Actions:
+    - dividends: Dividend history
+    - splits: Stock split history
+  
+  Segments & Peers:
+    - segments_product: Revenue by product/service
+    - segments_geo: Revenue by geography
+    - peers: Peer companies
+  
+  Other:
+    - market_cap: Market capitalization
+    - sec_filings: SEC filings list from FMP
+    - estimates: Analyst estimates from CapIQ (if available)
+
+EXAMPLES:
+  # Fetch prices and fundamentals
+  echo '{"ticker": "AAPL", "fields": ["prices", "fundamentals"]}' | ./mf-market-get
+  
+  # Fetch quarterly metrics and ratios
+  echo '{"ticker": "MSFT", "fields": ["key_metrics", "ratios"], "period": "quarter", "limit": 20}' | ./mf-market-get
+  
+  # Comprehensive analyst data
+  echo '{"ticker": "GOOGL", "fields": ["analyst_estimates", "analyst_recs", "price_target", "earnings_surprises"]}' | ./mf-market-get
+  
+  # Get everything
+  echo '{"ticker": "TSLA", "fields": ["prices", "fundamentals", "profile", "key_metrics", "ratios", "growth", "analyst_recs", "institutional", "segments_product"]}' | ./mf-market-get
+
+OUTPUT:
+  JSON with structure:
+  {
+    "ok": true,
+    "result": {"<field>": "<path_to_saved_file>", ...},
+    "paths": ["<all_file_paths>"],
+    "provenance": [{"source": "...", "fetched_at": "...", ...}],
+    "metrics": {"bytes": <total>, "t_ms": <elapsed_ms>, "fields_fetched": <count>}
+  }
 """
 import json
 import sys
@@ -23,6 +105,19 @@ from src.datahub import DataHub
 WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
 assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
 
+# Available data types that can be fetched
+AVAILABLE_FIELDS = [
+    'prices', 'fundamentals', 'estimates',
+    'profile', 'executives', 'market_cap', 
+    'key_metrics', 'key_metrics_ttm', 'ratios', 
+    'enterprise_values', 'growth', 'income_growth',
+    'owner_earnings', 'analyst_estimates', 'analyst_recs',
+    'upgrades_downgrades', 'earnings_surprises', 'price_target',
+    'peers', 'institutional', 'insider', 
+    'dividends', 'splits', 'segments_product', 'segments_geo',
+    'sec_filings', 'esg', 'exec_comp', 'quote'
+]
+
 
 def read_stdin():
     return sys.stdin.read()
@@ -40,6 +135,17 @@ def parse_range(range_str: str):
     return {'type': 'preset', 'value': range_str}
 
 
+def save_json_data(data, path: Path, field_name: str) -> tuple[str, int]:
+    """Helper to save JSON data and return path and byte count."""
+    if hasattr(data, 'model_dump_json'):
+        json_str = data.model_dump_json(indent=2)
+    else:
+        json_str = json.dumps(data, indent=2)
+    
+    path.write_text(json_str)
+    return str(path), len(json_str)
+
+
 def main():
     start_time = datetime.now()
     
@@ -50,11 +156,17 @@ def main():
         ticker = args.get('ticker', '').upper()
         fields = args.get('fields', ['prices'])
         range_str = args.get('range', '1y')
-        point_in_time = args.get('point_in_time', True)
+        period = args.get('period', 'annual')  # for metrics/ratios
+        limit = args.get('limit', None)  # for historical data
         format_type = args.get('format', 'concise')
         
         if not ticker:
             raise ValueError("ticker is required")
+        
+        # Validate fields
+        invalid_fields = [f for f in fields if f not in AVAILABLE_FIELDS]
+        if invalid_fields:
+            raise ValueError(f"Invalid fields: {invalid_fields}. Available: {AVAILABLE_FIELDS}")
         
         hub = DataHub()
         
@@ -69,59 +181,252 @@ def main():
         # Fetch prices
         if 'prices' in fields:
             range_info = parse_range(range_str)
-            
-            from_date = None
-            to_date = None
-            if range_info['type'] == 'custom':
-                from_date = range_info['from']
-                to_date = range_info['to']
+            from_date = range_info.get('from') if range_info['type'] == 'custom' else None
+            to_date = range_info.get('to') if range_info['type'] == 'custom' else None
             
             price_series = hub.price_series(ticker, from_date=from_date, to_date=to_date)
-            
-            # Save to file
             prices_path = market_dir / f"prices_{range_str.replace(':', '_')}.json"
-            prices_json = price_series.model_dump_json(indent=2)
-            prices_path.write_text(prices_json)
+            path_str, byte_count = save_json_data(price_series, prices_path, 'prices')
             
-            result['prices'] = str(prices_path)
-            paths.append(str(prices_path))
-            total_bytes += len(prices_json)
-            
+            result['prices'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
             provenance.append(price_series.provenance.model_dump())
         
         # Fetch fundamentals
         if 'fundamentals' in fields:
-            limit = 40  # Default to 10 years of quarterly data
-            if range_str == '1y':
-                limit = 4
-            elif range_str == '2y':
-                limit = 8
-            elif range_str == '5y':
-                limit = 20
-            
-            fundamentals = hub.fundamentals_quarterly(ticker, limit=limit)
-            
-            # Save to file
+            fund_limit = limit or (40 if range_str == '10y' else 20 if range_str == '5y' else 8 if range_str == '2y' else 4)
+            fundamentals = hub.fundamentals_quarterly(ticker, limit=fund_limit)
             fund_path = market_dir / "fundamentals_quarterly.json"
-            fund_json = fundamentals.model_dump_json(indent=2)
-            fund_path.write_text(fund_json)
+            path_str, byte_count = save_json_data(fundamentals, fund_path, 'fundamentals')
             
-            result['fundamentals'] = str(fund_path)
-            paths.append(str(fund_path))
-            total_bytes += len(fund_json)
-            
+            result['fundamentals'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
             provenance.append(fundamentals.provenance.model_dump())
         
-        # Fetch estimates (stub - not implemented yet)
-        if 'estimates' in fields:
-            raise NotImplementedError("Estimates not yet implemented in DataHub")
+        # Company profile
+        if 'profile' in fields:
+            data = hub.company_profile(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "profile.json", 'profile')
+            result['profile'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Key executives
+        if 'executives' in fields:
+            data = hub.key_executives(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "executives.json", 'executives')
+            result['executives'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Market cap
+        if 'market_cap' in fields:
+            data = hub.market_cap(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "market_cap.json", 'market_cap')
+            result['market_cap'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Key metrics
+        if 'key_metrics' in fields:
+            metric_limit = limit or 10
+            data = hub.key_metrics(ticker, period=period, limit=metric_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"key_metrics_{period}.json", 'key_metrics')
+            result['key_metrics'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Key metrics TTM
+        if 'key_metrics_ttm' in fields:
+            data = hub.key_metrics_ttm(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "key_metrics_ttm.json", 'key_metrics_ttm')
+            result['key_metrics_ttm'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Financial ratios
+        if 'ratios' in fields:
+            ratio_limit = limit or 10
+            data = hub.financial_ratios(ticker, period=period, limit=ratio_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"ratios_{period}.json", 'ratios')
+            result['ratios'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Enterprise values
+        if 'enterprise_values' in fields:
+            ev_limit = limit or 10
+            data = hub.enterprise_values(ticker, period=period, limit=ev_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"enterprise_values_{period}.json", 'enterprise_values')
+            result['enterprise_values'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Financial growth
+        if 'growth' in fields:
+            growth_limit = limit or 5
+            data = hub.financial_growth(ticker, period=period, limit=growth_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"growth_{period}.json", 'growth')
+            result['growth'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Income statement growth
+        if 'income_growth' in fields:
+            income_limit = limit or 5
+            data = hub.income_statement_growth(ticker, period=period, limit=income_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"income_growth_{period}.json", 'income_growth')
+            result['income_growth'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Owner earnings
+        if 'owner_earnings' in fields:
+            data = hub.owner_earnings(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "owner_earnings.json", 'owner_earnings')
+            result['owner_earnings'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Analyst estimates
+        if 'analyst_estimates' in fields:
+            est_limit = limit or 10
+            data = hub.analyst_estimates(ticker, period=period, limit=est_limit)
+            path_str, byte_count = save_json_data(data, market_dir / f"analyst_estimates_{period}.json", 'analyst_estimates')
+            result['analyst_estimates'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Analyst recommendations
+        if 'analyst_recs' in fields:
+            data = hub.analyst_recommendations(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "analyst_recs.json", 'analyst_recs')
+            result['analyst_recs'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Upgrades/downgrades
+        if 'upgrades_downgrades' in fields:
+            data = hub.upgrades_downgrades(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "upgrades_downgrades.json", 'upgrades_downgrades')
+            result['upgrades_downgrades'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Earnings surprises
+        if 'earnings_surprises' in fields:
+            data = hub.earnings_surprises(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "earnings_surprises.json", 'earnings_surprises')
+            result['earnings_surprises'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Price target
+        if 'price_target' in fields:
+            data = hub.price_target(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "price_target.json", 'price_target')
+            result['price_target'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Peers
+        if 'peers' in fields:
+            data = hub.stock_peers(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "peers.json", 'peers')
+            result['peers'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Institutional ownership
+        if 'institutional' in fields:
+            data = hub.institutional_ownership(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "institutional.json", 'institutional')
+            result['institutional'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Insider trading
+        if 'insider' in fields:
+            data = hub.insider_trading(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "insider.json", 'insider')
+            result['insider'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Dividends
+        if 'dividends' in fields:
+            data = hub.dividends(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "dividends.json", 'dividends')
+            result['dividends'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Stock splits
+        if 'splits' in fields:
+            data = hub.stock_splits(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "splits.json", 'splits')
+            result['splits'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Revenue segments by product
+        if 'segments_product' in fields:
+            data = hub.revenue_segments_by_product(ticker, period=period)
+            path_str, byte_count = save_json_data(data, market_dir / f"segments_product_{period}.json", 'segments_product')
+            result['segments_product'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Revenue segments by geography
+        if 'segments_geo' in fields:
+            data = hub.revenue_segments_by_geography(ticker, period=period)
+            path_str, byte_count = save_json_data(data, market_dir / f"segments_geo_{period}.json", 'segments_geo')
+            result['segments_geo'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # SEC filings list
+        if 'sec_filings' in fields:
+            filing_type = args.get('filing_type')  # optional
+            data = hub.sec_filings_list(ticker, filing_type=filing_type)
+            path_str, byte_count = save_json_data(data, market_dir / "sec_filings.json", 'sec_filings')
+            result['sec_filings'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # ESG ratings
+        if 'esg' in fields:
+            data = hub.esg_ratings(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "esg.json", 'esg')
+            result['esg'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Executive compensation
+        if 'exec_comp' in fields:
+            data = hub.executive_compensation(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "exec_comp.json", 'exec_comp')
+            result['exec_comp'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
+        
+        # Quote
+        if 'quote' in fields:
+            data = hub.quote(ticker)
+            path_str, byte_count = save_json_data(data, market_dir / "quote.json", 'quote')
+            result['quote'] = path_str
+            paths.append(path_str)
+            total_bytes += byte_count
         
         # Save metadata
         metadata = {
             'ticker': ticker,
             'fields': fields,
             'range': range_str,
-            'point_in_time': point_in_time,
+            'period': period,
+            'limit': limit,
             'fetched_at': datetime.now().isoformat(),
             'provenance': provenance
         }
@@ -138,7 +443,8 @@ def main():
             'provenance': provenance,
             'metrics': {
                 'bytes': total_bytes,
-                't_ms': int(elapsed)
+                't_ms': int(elapsed),
+                'fields_fetched': len(fields)
             },
             'format': format_type
         }

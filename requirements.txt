@@ -6,3 +6,6 @@ anyio>=4.0.0
 fastapi>=0.110.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0
+rich>=13.7
+prompt_toolkit>=3.0
+humanfriendly>=10.0

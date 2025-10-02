@@ -1,6 +1,6 @@
 """DataHub - facade that composes all providers and returns typed domain objects."""
 from __future__ import annotations
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from decimal import Decimal
 
 from src.providers.fmp import FmpProvider
@@ -268,6 +268,149 @@ class DataHub:
             provenance=Provenance(
                 source="CapIQ", fetched_at=None, meta={"info_type": info_type}
             ),
+        )
+
+    # ---- FMP Extended Methods (Raw JSON) ----
+
+    def company_profile(self, ticker: str) -> Dict[str, Any]:
+        """Fetch company profile from FMP (returns raw JSON)."""
+        return self.fmp.get_company_profile(ticker)
+
+    def key_executives(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch key executives from FMP (returns raw JSON)."""
+        return self.fmp.get_key_executives(ticker)
+
+    def market_cap(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch current market capitalization from FMP (returns raw JSON)."""
+        return self.fmp.get_market_capitalization(ticker)
+
+    def key_metrics(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch key financial metrics from FMP (P/E, ROE, etc) (returns raw JSON)."""
+        return self.fmp.get_key_metrics(ticker, period=period, limit=limit)
+
+    def key_metrics_ttm(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch trailing twelve month metrics from FMP (returns raw JSON)."""
+        return self.fmp.get_key_metrics_ttm(ticker)
+
+    def financial_ratios(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch financial ratios from FMP (liquidity, profitability, etc) (returns raw JSON)."""
+        return self.fmp.get_financial_ratios(ticker, period=period, limit=limit)
+
+    def enterprise_values(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch enterprise value data from FMP (returns raw JSON)."""
+        return self.fmp.get_enterprise_values(ticker, period=period, limit=limit)
+
+    def financial_growth(
+        self, ticker: str, period: str = "annual", limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Fetch financial growth metrics from FMP (revenue growth, net income growth) (returns raw JSON)."""
+        return self.fmp.get_financial_growth(ticker, period=period, limit=limit)
+
+    def income_statement_growth(
+        self, ticker: str, period: str = "annual", limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Fetch income statement growth rates from FMP (returns raw JSON)."""
+        return self.fmp.get_income_statement_growth(ticker, period=period, limit=limit)
+
+    def owner_earnings(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch owner earnings (Buffett-style metric) from FMP (returns raw JSON)."""
+        return self.fmp.get_owner_earnings(ticker)
+
+    def analyst_estimates(
+        self, ticker: str, period: str = "annual", limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Fetch analyst estimates from FMP (revenue, EPS forecasts) (returns raw JSON)."""
+        return self.fmp.get_analyst_estimates(ticker, period=period, limit=limit)
+
+    def analyst_recommendations(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst buy/sell/hold recommendations from FMP (returns raw JSON)."""
+        return self.fmp.get_analyst_recommendations(ticker)
+
+    def upgrades_downgrades(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst upgrades and downgrades from FMP (returns raw JSON)."""
+        return self.fmp.get_upgrades_downgrades(ticker)
+
+    def earnings_surprises(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch historical earnings surprises from FMP (returns raw JSON)."""
+        return self.fmp.get_earnings_surprises(ticker)
+
+    def price_target(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch analyst price targets from FMP (returns raw JSON)."""
+        return self.fmp.get_price_target(ticker)
+
+    def stock_peers(self, ticker: str) -> List[str]:
+        """Fetch peer companies from FMP (returns list of ticker symbols)."""
+        return self.fmp.get_stock_peers(ticker)
+
+    def institutional_ownership(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch institutional ownership from FMP (returns raw JSON)."""
+        return self.fmp.get_institutional_ownership(ticker)
+
+    def insider_trading(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch insider trading statistics from FMP (returns raw JSON)."""
+        return self.fmp.get_insider_trading(ticker)
+
+    def dividends(self, ticker: str) -> Dict[str, Any]:
+        """Fetch dividend history from FMP (returns raw JSON)."""
+        return self.fmp.get_dividends(ticker)
+
+    def stock_splits(self, ticker: str) -> Dict[str, Any]:
+        """Fetch stock split history from FMP (returns raw JSON)."""
+        return self.fmp.get_stock_splits(ticker)
+
+    def revenue_segments_by_product(
+        self, ticker: str, period: str = "annual"
+    ) -> List[Dict[str, Any]]:
+        """Fetch revenue segmentation by product from FMP (returns raw JSON)."""
+        return self.fmp.get_revenue_segments_by_product(ticker, period=period)
+
+    def revenue_segments_by_geography(
+        self, ticker: str, period: str = "annual"
+    ) -> List[Dict[str, Any]]:
+        """Fetch revenue segmentation by geography from FMP (returns raw JSON)."""
+        return self.fmp.get_revenue_segments_by_geography(ticker, period=period)
+
+    def sec_filings_list(
+        self, ticker: str, filing_type: Optional[str] = None, page: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Fetch SEC filings list from FMP (returns raw JSON)."""
+        return self.fmp.get_sec_filings(ticker, filing_type=filing_type, page=page)
+
+    def esg_ratings(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch ESG ratings from FMP (returns raw JSON)."""
+        return self.fmp.get_esg_ratings(ticker)
+
+    def executive_compensation(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch executive compensation from FMP (returns raw JSON)."""
+        return self.fmp.get_executive_compensation(ticker)
+
+    def quote(self, ticker: str) -> List[Dict[str, Any]]:
+        """Fetch real-time quote from FMP (returns raw JSON)."""
+        return self.fmp.get_quote(ticker)
+
+    def stock_screener(
+        self,
+        market_cap_min: Optional[int] = None,
+        market_cap_max: Optional[int] = None,
+        sector: Optional[str] = None,
+        industry: Optional[str] = None,
+        exchange: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Screen stocks by criteria from FMP (returns raw JSON)."""
+        return self.fmp.get_stock_screener(
+            market_cap_min=market_cap_min,
+            market_cap_max=market_cap_max,
+            sector=sector,
+            industry=industry,
+            exchange=exchange,
+            limit=limit,
         )
 
 
