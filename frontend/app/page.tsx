@@ -7,6 +7,7 @@ import CalcCard from '@/components/cards/CalcCard'
 import DocDiffCard from '@/components/cards/DocDiffCard'
 import DocumentsCard from '@/components/cards/DocumentsCard'
 import EstimatesCard from '@/components/cards/EstimatesCard'
+import FilingExtractCard from '@/components/cards/FilingExtractCard'
 import FileCard from '@/components/cards/FileCard'
 import GenericToolCard from '@/components/cards/GenericToolCard'
 import JsonExtractCard from '@/components/cards/JsonExtractCard'
@@ -56,7 +57,19 @@ const extractEnvelope = (payload: unknown): ToolEnvelope | null => {
     if (obj.normalized) return obj.normalized as ToolEnvelope
     if (obj.json) return obj.json as ToolEnvelope
     if ('ok' in obj || 'data' in obj || 'error' in obj || 'stderr' in obj) {
-      return obj as ToolEnvelope
+      const envelope = obj as ToolEnvelope
+      if (envelope.ok !== false && envelope.data && typeof envelope.data === 'object') {
+        const nested = envelope.data as Record<string, unknown>
+        if ('ok' in nested && nested.ok === false) {
+          return {
+            ...envelope,
+            ok: false,
+            error: (nested.error as string | undefined) ?? envelope.error,
+            data: envelope.data
+          }
+        }
+      }
+      return envelope
     }
   }
   return { ok: true, data: payload }
@@ -126,6 +139,8 @@ export default function Page() {
             return <JsonInspectCard key={idx} tool={toolName} envelope={envelope} />
           case 'mf_extract_json':
             return <JsonExtractCard key={idx} tool={toolName} envelope={envelope} />
+          case 'mf_filing_extract':
+            return <FilingExtractCard key={idx} tool={toolName} envelope={envelope} />
           case 'mf_doc_diff':
             return <DocDiffCard key={idx} tool={toolName} envelope={envelope} />
           case 'mf_valuation_basic_dcf':

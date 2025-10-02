@@ -4,6 +4,9 @@ import { z } from 'zod'
 
 const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:5051'
 
+const cleanArgs = (input: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined && value !== null))
+
 async function forwardToAgent(payload: unknown) {
   const response = await fetch(`${AGENT_URL}/query`, {
     method: 'POST',
@@ -21,7 +24,7 @@ async function forwardToAgent(payload: unknown) {
 const forward = (toolName: string, args: Record<string, unknown>) => ({
   forwardToAgent: {
     tool: toolName,
-    args
+    args: cleanArgs(args)
   }
 })
 
@@ -55,6 +58,21 @@ const fetchFiling = tool({
   }),
   execute: async ({ ticker, type, exhibit_limit }) =>
     forward('mf_documents_get', { ticker, type, exhibit_limit })
+})
+
+const extractFiling = tool({
+  description: 'Extract sections or search within a downloaded SEC filing',
+  parameters: z.object({
+    filing_path: z.string(),
+    mode: z.enum(['extract_sections', 'search_keywords', 'search_regex']).default('extract_sections'),
+    sections: z.array(z.string()).optional(),
+    keywords: z.array(z.string()).optional(),
+    pattern: z.string().optional(),
+    pre_window: z.number().int().min(0).max(5000).optional(),
+    post_window: z.number().int().min(0).max(5000).optional()
+  }),
+  execute: async ({ filing_path, mode, sections, keywords, pattern, pre_window, post_window }) =>
+    forward('mf_filing_extract', { filing_path, mode, sections, keywords, pattern, pre_window, post_window })
 })
 
 const fetchEstimates = tool({
@@ -139,6 +157,7 @@ export async function POST(request: NextRequest) {
       runCalcSimple,
       fetchMarket,
       fetchFiling,
+      extractFiling,
       fetchEstimates,
       inspectJson,
       extractJson,

@@ -225,6 +225,43 @@ async def mf_extract_json_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 @tool(
+    "mf_filing_extract",
+    "Extract sections or search filings via mf-filing-extract",
+    {
+        "filing_path": str,
+        "mode": str,
+        "sections": list,
+        "keywords": list,
+        "pattern": str,
+        "pre_window": int,
+        "post_window": int,
+        "format": str,
+    },
+)
+async def mf_filing_extract_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+    payload = {
+        "filing_path": args.get("filing_path"),
+        "mode": args.get("mode", "extract_sections"),
+        "sections": args.get("sections"),
+        "keywords": args.get("keywords"),
+        "pattern": args.get("pattern"),
+        "pre_window": args.get("pre_window"),
+        "post_window": args.get("post_window"),
+        "format": args.get("format", "concise"),
+    }
+    result = await run_cli("mf-filing-extract", payload, timeout=300.0)
+    return {
+        "content": [
+            {
+                "type": "json",
+                "name": "mf_filing_extract.result",
+                "json": result,
+            }
+        ]
+    }
+
+
+@tool(
     "mf_json_inspect",
     "Inspect JSON structure via mf-json-inspect",
     {
@@ -388,6 +425,7 @@ def build_sdk_server():
             mf_documents_get_tool,
             mf_estimates_get_tool,
             mf_extract_json_tool,
+            mf_filing_extract_tool,
             mf_json_inspect_tool,
             mf_market_get_tool,
             mf_qa_tool,
