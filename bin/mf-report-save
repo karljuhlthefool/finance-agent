@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""
+Save agent-generated reports and analyses to the workspace.
+Designed for final outputs, summaries, and comprehensive analyses.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        # Required fields
+        content = args.get('content')
+        report_type = args.get('type', 'analysis')  # analysis, summary, recommendation, comparison
+        ticker = args.get('ticker')
+        title = args.get('title')
+        
+        if not content:
+            raise ValueError("'content' is required (the report text/markdown)")
+        
+        # Determine output directory based on type
+        type_dirs = {
+            'analysis': 'reports/analysis',
+            'summary': 'reports/summaries',
+            'recommendation': 'reports/recommendations',
+            'comparison': 'reports/comparisons',
+            'valuation': 'reports/valuations',
+            'custom': 'reports/custom'
+        }
+        
+        output_dir = WORKSPACE / type_dirs.get(report_type, 'reports/custom')
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        ticker_part = f"{ticker}_" if ticker else ""
+        title_slug = title.lower().replace(' ', '_')[:50] if title else report_type
+        filename = f"{ticker_part}{title_slug}_{timestamp}.md"
+        
+        output_path = output_dir / filename
+        
+        # Add metadata header to markdown
+        metadata = f"""---
+title: {title or f"{ticker} {report_type.title()}" if ticker else report_type.title()}
+type: {report_type}
+ticker: {ticker or 'N/A'}
+generated: {datetime.now().isoformat()}
+---
+
+"""
+        
+        # Write report
+        full_content = metadata + content
+        output_path.write_text(full_content, encoding='utf-8')
+        
+        # Also save metadata as JSON
+        meta_path = output_path.with_suffix('.json')
+        metadata_json = {
+            'title': title or f"{ticker} {report_type.title()}" if ticker else report_type.title(),
+            'type': report_type,
+            'ticker': ticker,
+            'generated_at': datetime.now().isoformat(),
+            'report_path': str(output_path.resolve()),
+            'word_count': len(content.split()),
+            'line_count': len(content.splitlines())
+        }
+        meta_path.write_text(json.dumps(metadata_json, indent=2))
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        result = {
+            'ok': True,
+            'result': {
+                'report_path': str(output_path.resolve()),
+                'metadata_path': str(meta_path.resolve()),
+                'type': report_type,
+                'word_count': metadata_json['word_count'],
+                'line_count': metadata_json['line_count']
+            },
+            'paths': [str(output_path.resolve()), str(meta_path.resolve())],
+            'provenance': [{
+                'source': 'agent_generated',
+                'timestamp': datetime.now().isoformat()
+            }],
+            'metrics': {
+                't_ms': int(elapsed),
+                'cost_estimate': 0
+            },
+            'format': 'concise'
+        }
+        
+        print(json.dumps(result))
+        
+    except Exception as e:
+        result = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Required: 'content' (markdown/text). Optional: 'type', 'ticker', 'title'"
+        }
+        print(json.dumps(result))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

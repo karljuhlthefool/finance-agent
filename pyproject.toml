@@ -1,0 +1,21 @@
+[project]
+name = "claude-finance"
+version = "1.0.0"
+description = "CLI-first finance agent powered by Claude Agent SDK"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.65.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "mypy>=1.5.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

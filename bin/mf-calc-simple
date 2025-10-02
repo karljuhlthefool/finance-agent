@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""
+Deterministic calculations: deltas, growth, sums, averages.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import List, Dict, Optional
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def calc_delta(current: float, previous: float, mode: str = 'percent') -> Optional[float]:
+    """Calculate delta between two values."""
+    if previous == 0 or previous is None:
+        return None
+    
+    if mode == 'percent':
+        return ((current - previous) / abs(previous)) * 100
+    
+    return current - previous
+
+def calc_growth(series: List[Dict], period: str = 'yoy') -> List[Dict]:
+    """Calculate growth series (YoY or QoQ)."""
+    results = []
+    
+    for i, current in enumerate(series):
+        comparison = None
+        
+        if period == 'yoy':
+            # Year-over-year: find same quarter/month last year
+            curr_date = datetime.fromisoformat(current['date'].replace('Q', '-'))
+            for s in series:
+                try:
+                    comp_date = datetime.fromisoformat(s['date'].replace('Q', '-'))
+                    if (comp_date.year == curr_date.year - 1 and
+                        comp_date.month == curr_date.month):
+                        comparison = s
+                        break
+                except:
+                    pass
+        
+        elif period == 'qoq':
+            # Quarter-over-quarter: previous entry
+            if i + 1 < len(series):
+                comparison = series[i + 1]
+        
+        if comparison:
+            results.append({
+                'date': current['date'],
+                'value': current['value'],
+                'previous_value': comparison['value'],
+                'previous_date': comparison['date'],
+                'delta_abs': calc_delta(current['value'], comparison['value'], 'absolute'),
+                'delta_pct': calc_delta(current['value'], comparison['value'], 'percent'),
+                'period': period
+            })
+    
+    return results
+
+def calc_sum(values: List[float], weights: Optional[List[float]] = None) -> float:
+    """Calculate sum (optionally weighted)."""
+    if weights:
+        if len(weights) != len(values):
+            raise ValueError("Values and weights must have same length")
+        return sum(v * w for v, w in zip(values, weights))
+    
+    return sum(values)
+
+def calc_average(values: List[float], avg_type: str = 'mean') -> Optional[float]:
+    """Calculate average (mean or median)."""
+    if not values:
+        return None
+    
+    if avg_type == 'mean':
+        return calc_sum(values) / len(values)
+    
+    elif avg_type == 'median':
+        sorted_vals = sorted(values)
+        n = len(sorted_vals)
+        mid = n // 2
+        return sorted_vals[mid] if n % 2 else (sorted_vals[mid - 1] + sorted_vals[mid]) / 2
+    
+    return None
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        operation = args.get('op') or args.get('operation')
+        format_type = args.get('format', 'concise')
+        
+        if not operation:
+            raise ValueError("operation (op) required: delta | growth | sum | average")
+        
+        result = {}
+        paths = []
+        
+        if operation == 'delta':
+            current = args.get('current')
+            previous = args.get('previous')
+            mode = args.get('mode', 'percent')
+            
+            if current is None or previous is None:
+                raise ValueError("current and previous values required")
+            
+            result = {
+                'current': current,
+                'previous': previous,
+                'delta_abs': calc_delta(current, previous, 'absolute'),
+                'delta_pct': calc_delta(current, previous, 'percent'),
+                'mode': mode
+            }
+        
+        elif operation == 'growth':
+            series = args.get('series', [])
+            period = args.get('period', 'yoy')
+            
+            if not series:
+                raise ValueError("series array required with {date, value} objects")
+            
+            growth_results = calc_growth(series, period)
+            result = {'growth': growth_results, 'period': period}
+            
+            # Save to file
+            output_dir = WORKSPACE / "analysis" / "calculations"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().isoformat().replace(':', '-').split('.')[0]
+            output_path = output_dir / f"growth_{period}_{timestamp}.json"
+            output_path.write_text(json.dumps(growth_results, indent=2))
+            paths.append(str(output_path))
+        
+        elif operation == 'sum':
+            values = args.get('values', [])
+            weights = args.get('weights')
+            
+            if not values:
+                raise ValueError("values array required")
+            
+            result = {
+                'sum': calc_sum(values, weights),
+                'count': len(values),
+                'weighted': weights is not None
+            }
+        
+        elif operation == 'average':
+            values = args.get('values', [])
+            avg_type = args.get('type', 'mean')
+            
+            if not values:
+                raise ValueError("values array required")
+            
+            result = {
+                'average': calc_average(values, avg_type),
+                'type': avg_type,
+                'count': len(values)
+            }
+        
+        else:
+            raise ValueError(f"Unknown operation: {operation}. Use delta, growth, sum, or average")
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': result,
+            'paths': paths,
+            'provenance': [{'source': 'deterministic calculation', 'meta': {'operation': operation}}],
+            'metrics': {'t_ms': int(elapsed)},
+            'format': format_type
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Check operation type and required parameters for that operation"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

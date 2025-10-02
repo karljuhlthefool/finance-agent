@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""
+Compare documents or sections (e.g., Risk Factors YoY).
+"""
+import json
+import sys
+import os
+import re
+from pathlib import Path
+from datetime import datetime
+from typing import Optional, List, Dict
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def extract_section(text: str, section_name: str) -> Optional[str]:
+    """Extract a section by common headers."""
+    patterns = [
+        rf"(?:^|\n)\s*{section_name}[\s\S]*?(?=\n\s*(?:[A-Z][A-Za-z\s]+:|$))",
+        rf"Item\s+\d+[A-Z]?\.\s*{section_name}[\s\S]*?(?=Item\s+\d+|$)",
+        rf"(?:^|\n)#{1,3}\s*{section_name}[\s\S]*?(?=\n#{1,3}|$)"
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(0).strip()
+    
+    return None
+
+def compute_line_diff(text1: str, text2: str) -> Dict:
+    """Compute line-level diff."""
+    lines1 = [l.strip() for l in text1.split('\n') if l.strip()]
+    lines2 = [l.strip() for l in text2.split('\n') if l.strip()]
+    
+    set1 = set(lines1)
+    set2 = set(lines2)
+    
+    added = [l for l in lines2 if l not in set1]
+    removed = [l for l in lines1 if l not in set2]
+    unchanged = [l for l in lines2 if l in set1]
+    
+    return {
+        'added': added[:50],  # Limit for token efficiency
+        'removed': removed[:50],
+        'stats': {
+            'lines_added': len(added),
+            'lines_removed': len(removed),
+            'lines_unchanged': len(unchanged),
+            'total_changes': len(added) + len(removed)
+        }
+    }
+
+def compute_char_diff(text1: str, text2: str) -> Dict:
+    """Compute character-level diff."""
+    len1 = len(text1)
+    len2 = len(text2)
+    
+    # Simple character-level similarity
+    common_prefix = 0
+    while (common_prefix < min(len1, len2) and 
+           text1[common_prefix] == text2[common_prefix]):
+        common_prefix += 1
+    
+    similarity = (2 * common_prefix) / (len1 + len2) if (len1 + len2) > 0 else 1.0
+    
+    return {
+        'char_added': len2 - common_prefix,
+        'char_removed': len1 - common_prefix,
+        'similarity_pct': f"{similarity * 100:.2f}"
+    }
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        doc1_path = args.get('document1') or args.get('doc1')
+        doc2_path = args.get('document2') or args.get('doc2')
+        section = args.get('section')
+        diff_type = args.get('type', 'line')
+        format_type = args.get('format', 'concise')
+        
+        if not doc1_path or not doc2_path:
+            raise ValueError("document1 and document2 paths required")
+        
+        doc1 = Path(doc1_path)
+        doc2 = Path(doc2_path)
+        
+        if not doc1.exists():
+            raise ValueError(f"Document not found: {doc1_path}")
+        
+        if not doc2.exists():
+            raise ValueError(f"Document not found: {doc2_path}")
+        
+        text1 = doc1.read_text(encoding='utf-8')
+        text2 = doc2.read_text(encoding='utf-8')
+        
+        # Extract specific section if requested
+        if section:
+            section1 = extract_section(text1, section)
+            section2 = extract_section(text2, section)
+            
+            if not section1 or not section2:
+                raise ValueError(f'Section "{section}" not found in one or both documents')
+            
+            text1 = section1
+            text2 = section2
+        
+        diff = {}
+        
+        if diff_type in ('line', 'both'):
+            diff['line_diff'] = compute_line_diff(text1, text2)
+        
+        if diff_type in ('char', 'both'):
+            diff['char_diff'] = compute_char_diff(text1, text2)
+        
+        # Save diff result
+        output_dir = WORKSPACE / "analysis" / "diffs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        doc1_name = doc1.stem
+        doc2_name = doc2.stem
+        timestamp = datetime.now().isoformat().replace(':', '-').split('.')[0]
+        output_path = output_dir / f"diff_{doc1_name}_vs_{doc2_name}_{timestamp}.json"
+        
+        full_result = {
+            'document1': str(doc1_path),
+            'document2': str(doc2_path),
+            'section': section or 'full document',
+            'type': diff_type,
+            'diff': diff,
+            'generated_at': datetime.now().isoformat()
+        }
+        
+        output_path.write_text(json.dumps(full_result, indent=2))
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        result = {
+            'diff_summary': diff.get('line_diff', {}).get('stats') or diff.get('char_diff', {}),
+            'output_file': str(output_path)
+        }
+        
+        if format_type == 'detailed':
+            result['diff_details'] = diff
+        
+        output = {
+            'ok': True,
+            'result': result,
+            'paths': [str(output_path)],
+            'provenance': [{
+                'source': 'document comparison',
+                'meta': {'doc1': str(doc1_path), 'doc2': str(doc2_path), 'section': section or 'full'}
+            }],
+            'metrics': {'t_ms': int(elapsed)},
+            'format': format_type
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Check document paths" if "not found" in str(e) else "Ensure both documents exist and are readable"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

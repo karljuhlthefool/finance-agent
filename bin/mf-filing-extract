@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""
+Extract specific sections or search filings for content.
+Uses SEC filing utilities for cleaner, more focused outputs.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.datahub import DataHub
+from src.domain.models import FilingRef
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+
+def main():
+    try:
+        args = json.loads(sys.stdin.read() or "{}")
+        
+        # Mode: extract_sections, search_keywords, or search_regex
+        mode = args.get("mode", "extract_sections")
+        filing_path = args.get("filing_path")
+        
+        if not filing_path:
+            print(json.dumps({
+                "ok": False,
+                "error": "filing_path required (main_text_path from mf-documents-get)",
+                "hint": "First run mf-documents-get, then use its result.main_text path"
+            }))
+            sys.exit(1)
+        
+        # Reconstruct FilingRef from filing metadata
+        filing_dir = Path(filing_path).parent
+        metadata_path = filing_dir / "metadata.json"
+        
+        if not metadata_path.exists():
+            print(json.dumps({
+                "ok": False,
+                "error": "Filing metadata not found",
+                "hint": "The filing_path must come from mf-documents-get output"
+            }))
+            sys.exit(1)
+        
+        metadata = json.loads(metadata_path.read_text())
+        exhibits_path = filing_dir / "exhibits" / "index.json"
+        
+        filing_ref = FilingRef(
+            ticker=metadata["ticker"],
+            form=metadata["form"],
+            filing_date=metadata["filing_date"],
+            accession=metadata["accession"],
+            cik=metadata["cik"],
+            main_text_path=filing_path,
+            exhibits_index_path=str(exhibits_path) if exhibits_path.exists() else None,
+            provenance={"source": "SEC EDGAR", "fetched_at": metadata["downloaded_at"], "meta": {}}
+        )
+        
+        hub = DataHub()
+        result = {}
+        output_paths = []
+        
+        if mode == "extract_sections":
+            # Extract Item sections (mda, business, risk_factors, etc.)
+            sections = args.get("sections", ["mda", "business", "risk_factors"])
+            extracted = hub.extract_filing_sections(filing_ref, sections=sections)
+            
+            # Save each section to a file
+            sections_dir = filing_dir / "sections"
+            sections_dir.mkdir(exist_ok=True)
+            
+            for section_name, content in extracted.items():
+                if content:
+                    section_path = sections_dir / f"{section_name}.txt"
+                    section_path.write_text(content, encoding="utf-8")
+                    result[section_name] = str(section_path)
+                    output_paths.append(str(section_path))
+                else:
+                    result[section_name] = None
+        
+        elif mode == "search_keywords":
+            # Search for exact phrases
+            keywords = args.get("keywords", [])
+            if not keywords:
+                print(json.dumps({
+                    "ok": False,
+                    "error": "keywords list required for search_keywords mode",
+                    "hint": 'Example: {"mode":"search_keywords","keywords":["artificial intelligence","machine learning"]}'
+                }))
+                sys.exit(1)
+            
+            pre_window = int(args.get("pre_window", 1000))
+            post_window = int(args.get("post_window", 1000))
+            
+            snippets = hub.search_filing_keywords(
+                filing_ref, keywords, pre_window=pre_window, post_window=post_window
+            )
+            
+            # Save snippets
+            search_dir = filing_dir / "searches"
+            search_dir.mkdir(exist_ok=True)
+            search_path = search_dir / f"keywords_{'_'.join(keywords[:2])}.txt"
+            search_path.write_text(snippets, encoding="utf-8")
+            
+            result["snippets"] = str(search_path)
+            result["keywords"] = keywords
+            output_paths.append(str(search_path))
+        
+        elif mode == "search_regex":
+            # Search with regex pattern
+            pattern = args.get("pattern")
+            if not pattern:
+                print(json.dumps({
+                    "ok": False,
+                    "error": "pattern required for search_regex mode",
+                    "hint": 'Example: {"mode":"search_regex","pattern":"revenue.{0,50}growth"}'
+                }))
+                sys.exit(1)
+            
+            pre_window = int(args.get("pre_window", 500))
+            post_window = int(args.get("post_window", 500))
+            
+            snippets_list = hub.search_filing_regex(
+                filing_ref, pattern, pre_window=pre_window, post_window=post_window
+            )
+            
+            # Save snippets
+            search_dir = filing_dir / "searches"
+            search_dir.mkdir(exist_ok=True)
+            search_path = search_dir / f"regex_{pattern[:20].replace('/', '_')}.txt"
+            search_path.write_text("\n\n--- MATCH ---\n\n".join(snippets_list), encoding="utf-8")
+            
+            result["snippets"] = str(search_path)
+            result["pattern"] = pattern
+            result["match_count"] = len(snippets_list)
+            output_paths.append(str(search_path))
+        
+        else:
+            print(json.dumps({
+                "ok": False,
+                "error": f"Unknown mode: {mode}",
+                "hint": "Valid modes: extract_sections, search_keywords, search_regex"
+            }))
+            sys.exit(1)
+        
+        print(json.dumps({
+            "ok": True,
+            "result": result,
+            "paths": output_paths,
+            "provenance": [{"source": "SEC EDGAR", "mode": mode}],
+            "metrics": {},
+            "format": "concise"
+        }))
+    
+    except Exception as e:
+        print(json.dumps({
+            "ok": False,
+            "error": str(e),
+            "hint": "Check filing_path and mode parameters"
+        }))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+

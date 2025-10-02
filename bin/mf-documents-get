@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+Fetch SEC filings (10-K/10-Q/8-K) with exhibits.
+REFACTORED: Now uses DataHub for typed, validated responses.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from pydantic import ValidationError
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.datahub import DataHub
+
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+
+def read_stdin():
+    return sys.stdin.read()
+
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        form_type = args.get('type', '10-K').upper()
+        ticker = args.get('ticker', '').upper()
+        exhibit_limit = args.get('exhibit_limit', 25)
+        format_type = args.get('format', 'concise')
+        
+        if not ticker:
+            raise ValueError("ticker is required")
+        
+        if form_type not in ['10-K', '10-Q', '8-K', '10K', '10Q', '8K', '20-F', '40-F', '20F', '40F']:
+            raise ValueError(f"Invalid form type: {form_type}. Use 10-K, 10-Q, 8-K, 20-F, or 40-F")
+        
+        # Use DataHub
+        hub = DataHub()
+        filing_ref = hub.latest_filing(ticker, form_type=form_type, exhibit_limit=exhibit_limit)
+        
+        # Read metadata file to get exhibit count
+        metadata_path = Path(filing_ref.main_text_path).parent / "metadata.json"
+        metadata = {}
+        if metadata_path.exists():
+            metadata = json.loads(metadata_path.read_text())
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Read file size
+        content_size = Path(filing_ref.main_text_path).stat().st_size
+        
+        output = {
+            'ok': True,
+            'result': {
+                'filing_date': filing_ref.filing_date,
+                'form': filing_ref.form,
+                'main_text': filing_ref.main_text_path,
+                'exhibits_index': filing_ref.exhibits_index_path
+            },
+            'paths': [
+                filing_ref.main_text_path,
+                filing_ref.exhibits_index_path,
+                str(metadata_path)
+            ],
+            'provenance': [filing_ref.provenance.model_dump()],
+            'metrics': {
+                'downloaded': 1,
+                't_ms': int(elapsed),
+                'bytes': content_size
+            },
+            'format': format_type
+        }
+        
+        print(json.dumps(output))
+        
+    except ValidationError as e:
+        output = {
+            'ok': False,
+            'error': 'validation_error',
+            'hint': f"Data validation failed: {str(e)}"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Try a different date or form type" if "No" in str(e) else "Check ticker symbol and network connection"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

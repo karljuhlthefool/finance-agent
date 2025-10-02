@@ -1,0 +1,8 @@
+#!/bin/bash
+# Wrapper script for Claude Finance Agent
+# Usage: ./agent "Your query here"
+
+cd "$(dirname "$0")"
+source venv/bin/activate
+python src/agent.py "$@"
+

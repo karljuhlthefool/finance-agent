@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""
+Fast JSON extraction using jq-style queries (no LLM needed for simple extractions).
+For complex queries, falls back to Claude Haiku (cheap).
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+import re
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+def read_stdin():
+    return sys.stdin.read()
+
+def extract_with_jq_style(data, path):
+    """
+    Extract data using simple path notation (like jq but in Python).
+    Examples:
+    - "income_statement[0].revenue" → data['income_statement'][0]['revenue']
+    - "income_statement[-1].netIncome" → last item's netIncome
+    - "income_statement[:3]" → first 3 items
+    - "cash_flow[0].freeCashFlow" → specific nested field
+    
+    Implementation: Pure Python using regex + dict/list access (no jq binary needed).
+    """
+    try:
+        # Parse path components: keys, indices, slices
+        # Regex captures: dict keys OR array [index/slice]
+        parts = re.findall(r'([^\[\].]+)|\[([^\]]+)\]', path)
+        
+        current = data
+        path_so_far = ""
+        
+        for part in parts:
+            key = part[0] if part[0] else part[1]
+            
+            if not key:
+                continue
+            
+            path_so_far += f".{key}" if part[0] else f"[{key}]"
+                
+            # Handle array indexing: [0], [-1], etc.
+            if key.lstrip('-').isdigit():
+                index = int(key)
+                if not isinstance(current, list):
+                    raise ValueError(f"Path '{path_so_far}': expected array, got {type(current).__name__}")
+                current = current[index]
+            
+            # Handle array slicing: [:3], [1:5], etc.
+            elif ':' in key:
+                if not isinstance(current, list):
+                    raise ValueError(f"Path '{path_so_far}': expected array, got {type(current).__name__}")
+                slice_parts = key.split(':')
+                start = int(slice_parts[0]) if slice_parts[0] else None
+                end = int(slice_parts[1]) if slice_parts[1] else None
+                current = current[start:end]
+            
+            # Handle dictionary key
+            else:
+                if not isinstance(current, dict):
+                    raise ValueError(f"Path '{path_so_far}': expected object, got {type(current).__name__}")
+                if key not in current:
+                    available = list(current.keys())[:10]
+                    raise ValueError(f"Path '{path_so_far}': key '{key}' not found. Available keys: {available}")
+                current = current[key]
+        
+        return current
+    except (KeyError, IndexError, TypeError) as e:
+        raise ValueError(f"Path '{path}' extraction failed: {str(e)}")
+
+def extract_with_haiku(data, instruction):
+    """Use Claude Haiku for complex extraction (cheap and fast)."""
+    if not ANTHROPIC_API_KEY:
+        raise ValueError("ANTHROPIC_API_KEY not set - needed for complex queries")
+    
+    import anthropic
+    
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    
+    # Use Claude 3.5 Haiku (cheap and fast)
+    response = client.messages.create(
+        model="claude-3-5-haiku-latest",
+        max_tokens=4096,
+        temperature=0,
+        messages=[{
+            "role": "user",
+            "content": f"Extract exactly what is requested from the JSON data. Return ONLY the extracted value as valid JSON, no explanation.\n\nInstruction: {instruction}\n\nData:\n{json.dumps(data, indent=2)}"
+        }]
+    )
+    
+    result = response.content[0].text.strip()
+    
+    # Try to parse as JSON
+    try:
+        return json.loads(result)
+    except:
+        # If not valid JSON, return as string
+        return result
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        # Input options
+        json_file = args.get('json_file')
+        json_data = args.get('json_data')  # Inline JSON
+        
+        # Extraction method
+        path = args.get('path')  # Simple path like "income_statement[0].revenue"
+        instruction = args.get('instruction')  # Natural language for GPT
+        
+        # Load JSON data
+        if json_file:
+            data = json.loads(Path(json_file).read_text())
+        elif json_data:
+            data = json_data if isinstance(json_data, dict) else json.loads(json_data)
+        else:
+            raise ValueError("Either json_file or json_data required")
+        
+        # Extract using appropriate method
+        if path:
+            # Fast path: no LLM needed!
+            result = extract_with_jq_style(data, path)
+            method = "path-based"
+            cost_estimate = 0
+        elif instruction:
+            # Complex extraction: use Claude Haiku
+            result = extract_with_haiku(data, instruction)
+            method = "claude-3-5-haiku-latest"
+            # Cost depends on data size: ~$0.001 per 1K input tokens + $0.005 per 1K output
+            # For typical JSON (50K tokens): ~$0.05 per call
+            data_tokens = len(json.dumps(data)) / 4  # Rough estimate
+            cost_estimate = (data_tokens / 1000) * 0.001 + 0.001  # Input + typical output
+        else:
+            raise ValueError("Either 'path' or 'instruction' required")
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': result,
+            'paths': [],
+            'provenance': [{'source': json_file or 'inline', 'meta': {'method': method}}],
+            'metrics': {
+                't_ms': int(elapsed),
+                'cost_estimate': cost_estimate
+            },
+            'format': 'concise'
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        result = {
+            'ok': False,
+            'error': str(e),
+            'hint': "For simple extraction use 'path' (fast, free). For complex use 'instruction' (claude-3-5-haiku-latest, ~$0.005)."
+        }
+        print(json.dumps(result))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

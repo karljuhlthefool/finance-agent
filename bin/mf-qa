@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""
+LLM-powered Q&A with schema enforcement over large documents.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+import anthropic
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+def read_stdin():
+    return sys.stdin.read()
+
+def load_docs(paths):
+    """Load documents from file paths."""
+    parts = []
+    for p in paths:
+        try:
+            path = Path(p)
+            text = path.read_text(encoding='utf-8')
+            parts.append({'path': str(p), 'text': text})
+        except Exception as e:
+            raise Exception(f"Failed to load {p}: {str(e)}")
+    return parts
+
+def chunk_string(s, chunk_size=15000):
+    """Split string into chunks."""
+    return [s[i:i+chunk_size] for i in range(0, len(s), chunk_size)]
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        if not API_KEY:
+            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+        
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        instruction = args.get('instruction', 'Summarize.')
+        model = args.get('model', os.getenv('QA_MODEL', 'claude-3-5-sonnet-latest'))
+        doc_paths = args.get('document_paths', [])
+        inline = args.get('inline_text', '')
+        schema = args.get('output_schema')
+        format_type = args.get('format', 'concise')
+        max_chunk_chars = args.get('max_chunk_chars', 15000)
+        
+        # Model cost hints (for agent to choose wisely)
+        model_costs = {
+            'claude-3-5-sonnet-latest': 'expensive',  # Best quality
+            'claude-3-5-haiku-latest': 'cheap',        # Fast and cheap
+        }
+        
+        # Helpful error for large inline text
+        if len(inline) > 50000 and not doc_paths:
+            raise ValueError(
+                "Large inline_text detected. "
+                "Save to file first and pass document_paths for better performance."
+            )
+        
+        # Load & concatenate docs
+        full = ""
+        provenance = []
+        
+        if doc_paths:
+            loaded = load_docs(doc_paths)
+            for part in loaded:
+                full += f"\n\n===== FILE: {part['path']} =====\n{part['text']}"
+                provenance.append({
+                    'source': part['path'],
+                    'meta': {'selector': 'full document'}
+                })
+        
+        if inline:
+            full += f"\n\n===== INLINE =====\n{inline}"
+        
+        if not full:
+            raise ValueError("No content provided (document_paths or inline_text required)")
+        
+        # Chunking
+        chunks = chunk_string(full, max_chunk_chars)
+        
+        client = anthropic.Anthropic(api_key=API_KEY)
+        
+        system_prompt = "\n".join([
+            "You are a precise QA tool. Follow the user's INSTRUCTION exactly.",
+            "If output_schema is provided, return STRICT JSON that validates against it. No extra text.",
+            "If citations are obvious (file names and line excerpts), include them as an array of strings."
+        ])
+        
+        # Map-reduce over chunks, tracking token usage
+        partials = []
+        total_input_tokens = 0
+        total_output_tokens = 0
+        
+        for idx, chunk in enumerate(chunks):
+            content_parts = [
+                f"INSTRUCTION:\n{instruction}",
+                f"CHUNK {idx+1}/{len(chunks)}:\n{chunk}"
+            ]
+            
+            if schema:
+                content_parts.append(f"OUTPUT_SCHEMA (JSON):\n{json.dumps(schema)}")
+            
+            content = "\n\n".join(content_parts)
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=1500,
+                system=system_prompt,
+                messages=[{"role": "user", "content": content}]
+            )
+            
+            text = response.content[0].text if response.content else ""
+            partials.append(text)
+            
+            # Track usage
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
+        
+        # Reduce step
+        reduce_parts = [f"INSTRUCTION:\n{instruction}"]
+        if schema:
+            reduce_parts.append(f"OUTPUT_SCHEMA (JSON):\n{json.dumps(schema)}")
+        reduce_parts.append(f"PARTIALS:\n{chr(10).join(['-----'] + [p for sublist in [[p, '-----'] for p in partials] for p in sublist])}")
+        
+        reduce_response = client.messages.create(
+            model=model,
+            max_tokens=1500,
+            system=system_prompt,
+            messages=[{"role": "user", "content": "\n\n".join(reduce_parts)}]
+        )
+        
+        final_text = reduce_response.content[0].text if reduce_response.content else ""
+        answer = final_text
+        
+        # Add reduce step usage
+        total_input_tokens += reduce_response.usage.input_tokens
+        total_output_tokens += reduce_response.usage.output_tokens
+        
+        if schema:
+            try:
+                answer = json.loads(final_text)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Schema validation failed: output is not valid JSON. {str(e)}")
+        
+        # Save result to file - use .json for structured, .md for unstructured
+        output_dir = WORKSPACE / "outputs" / "answers"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().isoformat().replace(':', '-').split('.')[0]
+        
+        if schema:
+            # Structured output -> save as JSON
+            output_path = output_dir / f"answer_{timestamp}.json"
+            output_path.write_text(json.dumps(answer, indent=2, ensure_ascii=False))
+        else:
+            # Unstructured output -> save as Markdown
+            output_path = output_dir / f"answer_{timestamp}.md"
+            output_path.write_text(answer, encoding='utf-8')
+        
+        # Ensure absolute path
+        absolute_output = output_path.resolve()
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Calculate cost based on model
+        if model == 'claude-3-5-sonnet-latest':
+            cost_usd = (total_input_tokens / 1_000_000 * 3.0) + (total_output_tokens / 1_000_000 * 15.0)
+        elif model == 'claude-3-5-haiku-latest':
+            cost_usd = (total_input_tokens / 1_000_000 * 0.25) + (total_output_tokens / 1_000_000 * 1.25)
+        else:
+            # Default to sonnet pricing for unknown models
+            cost_usd = (total_input_tokens / 1_000_000 * 3.0) + (total_output_tokens / 1_000_000 * 15.0)
+        
+        result = {
+            'ok': True,
+            'result': answer,
+            'paths': [str(absolute_output)],
+            'provenance': provenance,
+            'metrics': {
+                'chunks': len(chunks),
+                't_ms': int(elapsed),
+                'bytes': len(full),
+                'input_tokens': total_input_tokens,
+                'output_tokens': total_output_tokens,
+                'cost_usd': round(cost_usd, 4)
+            },
+            'format': format_type
+        }
+        
+        print(json.dumps(result, ensure_ascii=False))
+        
+    except Exception as e:
+        result = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Save large text to a file first" if "document_paths" in str(e) else None
+        }
+        print(json.dumps(result))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

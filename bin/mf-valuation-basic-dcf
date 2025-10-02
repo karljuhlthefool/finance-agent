@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""
+DCF valuation with base/bull/bear scenarios.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import List, Dict
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def calculate_dcf(fcf_series: List[float], wacc: float, terminal_growth: float, shares: int) -> Dict:
+    """Calculate DCF valuation."""
+    # Discount each year's FCF
+    discounted_cash_flows = []
+    for idx, fcf in enumerate(fcf_series):
+        year = idx + 1
+        discount_factor = (1 + wacc) ** year
+        pv = fcf / discount_factor
+        discounted_cash_flows.append({
+            'year': year,
+            'fcf': fcf,
+            'discount_factor': discount_factor,
+            'pv': pv
+        })
+    
+    # Terminal value using Gordon Growth Model
+    last_fcf = fcf_series[-1]
+    terminal_fcf = last_fcf * (1 + terminal_growth)
+    terminal_value = terminal_fcf / (wacc - terminal_growth)
+    pv_terminal = terminal_value / ((1 + wacc) ** len(fcf_series))
+    
+    # Sum up NPV
+    pv_operating = sum(cf['pv'] for cf in discounted_cash_flows)
+    enterprise_value = pv_operating + pv_terminal
+    equity_value = enterprise_value  # Simplified: assume no net debt
+    price_per_share = equity_value / shares
+    
+    return {
+        'cash_flows': discounted_cash_flows,
+        'pv_operating': pv_operating,
+        'terminal_value': terminal_value,
+        'pv_terminal': pv_terminal,
+        'enterprise_value': enterprise_value,
+        'equity_value': equity_value,
+        'shares_outstanding': shares,
+        'price_per_share': price_per_share
+    }
+
+def generate_scenarios(base_fcf: List[float], wacc: float, terminal_growth: float, shares: int) -> Dict:
+    """Generate base/bull/bear scenarios."""
+    # Base scenario
+    base = calculate_dcf(base_fcf, wacc, terminal_growth, shares)
+    
+    # Bull scenario: 20% higher FCF, lower discount rate
+    bull_fcf = [f * 1.2 for f in base_fcf]
+    bull_wacc = wacc * 0.9
+    bull = calculate_dcf(bull_fcf, bull_wacc, terminal_growth * 1.5, shares)
+    
+    # Bear scenario: 20% lower FCF, higher discount rate
+    bear_fcf = [f * 0.8 for f in base_fcf]
+    bear_wacc = wacc * 1.1
+    bear = calculate_dcf(bear_fcf, bear_wacc, terminal_growth * 0.5, shares)
+    
+    return {
+        'base': {'name': 'base', 'npv': base['equity_value'], 'per_share': base['price_per_share'], 'details': base},
+        'bull': {'name': 'bull', 'npv': bull['equity_value'], 'per_share': bull['price_per_share'], 'details': bull},
+        'bear': {'name': 'bear', 'npv': bear['equity_value'], 'per_share': bear['price_per_share'], 'details': bear}
+    }
+
+def derive_fcf_from_fundamentals(ticker: str) -> List[float]:
+    """Derive FCF series from fundamentals file (domain structure)."""
+    market_dir = WORKSPACE / "data" / "market" / ticker
+    fund_path = market_dir / "fundamentals_quarterly.json"
+    
+    if not fund_path.exists():
+        raise ValueError(f"Fundamentals not found for {ticker}. Run mf-market-get first.")
+    
+    fundamentals = json.loads(fund_path.read_text())
+    quarters = fundamentals.get('quarters', [])
+    if len(quarters) < 4:
+        raise ValueError("Insufficient quarterly data. Need at least 4 quarters.")
+    
+    # domain models write oldest→newest; take latest 4
+    last4 = quarters[-4:]
+    # Convert string FCF values to float
+    annual_fcf = sum(float(q.get('fcf') or 0) for q in last4)
+    
+    # simple 5-year projection @10%
+    projected = [annual_fcf * (1.10 ** i) for i in range(1, 6)]
+    return projected
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        ticker = args.get('ticker', '').upper()
+        years = args.get('years', 5)
+        wacc = args.get('wacc', 0.10)
+        terminal = args.get('terminal', {})
+        terminal_method = terminal.get('method', 'gordon')
+        terminal_param = terminal.get('param', 0.02)
+        shares_outstanding = args.get('shares_outstanding')
+        fcf_series = args.get('fcfe_series') or args.get('fcf_series')
+        format_type = args.get('format', 'concise')
+        
+        if not ticker:
+            raise ValueError("ticker is required")
+        
+        if not shares_outstanding:
+            raise ValueError("shares_outstanding is required")
+        
+        provenance = []
+        
+        # Derive FCF if not provided
+        if not fcf_series:
+            fcf_series = derive_fcf_from_fundamentals(ticker)
+            provenance.append({
+                'source': 'fundamentals_quarterly.json',
+                'meta': {'derivation': 'annualized OCF - CapEx, projected 5y @ 10% growth'}
+            })
+        else:
+            provenance.append({
+                'source': 'user-provided',
+                'meta': {'fcf_series': 'manual input'}
+            })
+        
+        if not fcf_series:
+            raise ValueError("fcf_series must be array of numbers")
+        
+        # Ensure we have the right number of years
+        if len(fcf_series) < years:
+            # Extrapolate with last growth rate
+            if len(fcf_series) >= 2:
+                growth_rate = (fcf_series[-1] / fcf_series[-2]) - 1
+            else:
+                growth_rate = 0.10
+            
+            while len(fcf_series) < years:
+                fcf_series.append(fcf_series[-1] * (1 + growth_rate))
+        
+        # Trim to requested years
+        fcf_series = fcf_series[:years]
+        
+        # Generate scenarios
+        scenarios = generate_scenarios(fcf_series, wacc, terminal_param, shares_outstanding)
+        
+        # Save detailed table
+        output_dir = WORKSPACE / "analysis" / "tables"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        table_path = output_dir / f"dcf_{ticker}.json"
+        
+        full_result = {
+            'ticker': ticker,
+            'assumptions': {
+                'wacc': wacc,
+                'terminal_growth': terminal_param,
+                'terminal_method': terminal_method,
+                'shares_outstanding': shares_outstanding,
+                'projection_years': years
+            },
+            'fcf_series': fcf_series,
+            'scenarios': {
+                'base': scenarios['base']['details'],
+                'bull': scenarios['bull']['details'],
+                'bear': scenarios['bear']['details']
+            },
+            'summary': [
+                {'name': s['name'], 'npv': s['npv'], 'per_share': s['per_share']}
+                for s in [scenarios['base'], scenarios['bull'], scenarios['bear']]
+            ]
+        }
+        
+        table_path.write_text(json.dumps(full_result, indent=2))
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': {
+                'table': str(table_path),
+                'scenarios': full_result['summary']
+            },
+            'paths': [str(table_path)],
+            'provenance': provenance,
+            'metrics': {'t_ms': int(elapsed)},
+            'format': format_type
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Run mf-market-get first to fetch fundamentals" if "fundamentals" in str(e) else "Check required parameters: ticker, shares_outstanding"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""
+Fetch market data: prices, fundamentals, estimates.
+REFACTORED: Now uses DataHub for typed, validated responses.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from pydantic import ValidationError
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.datahub import DataHub
+
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+
+def read_stdin():
+    return sys.stdin.read()
+
+
+def parse_range(range_str: str):
+    """Parse range string for date filtering."""
+    import re
+    
+    # Check for custom date range YYYY-MM-DD:YYYY-MM-DD
+    match = re.match(r'^(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})$', range_str)
+    if match:
+        return {'type': 'custom', 'from': match.group(1), 'to': match.group(2)}
+    
+    return {'type': 'preset', 'value': range_str}
+
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        ticker = args.get('ticker', '').upper()
+        fields = args.get('fields', ['prices'])
+        range_str = args.get('range', '1y')
+        point_in_time = args.get('point_in_time', True)
+        format_type = args.get('format', 'concise')
+        
+        if not ticker:
+            raise ValueError("ticker is required")
+        
+        hub = DataHub()
+        
+        result = {}
+        paths = []
+        provenance = []
+        total_bytes = 0
+        
+        market_dir = WORKSPACE / "data" / "market" / ticker
+        market_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Fetch prices
+        if 'prices' in fields:
+            range_info = parse_range(range_str)
+            
+            from_date = None
+            to_date = None
+            if range_info['type'] == 'custom':
+                from_date = range_info['from']
+                to_date = range_info['to']
+            
+            price_series = hub.price_series(ticker, from_date=from_date, to_date=to_date)
+            
+            # Save to file
+            prices_path = market_dir / f"prices_{range_str.replace(':', '_')}.json"
+            prices_json = price_series.model_dump_json(indent=2)
+            prices_path.write_text(prices_json)
+            
+            result['prices'] = str(prices_path)
+            paths.append(str(prices_path))
+            total_bytes += len(prices_json)
+            
+            provenance.append(price_series.provenance.model_dump())
+        
+        # Fetch fundamentals
+        if 'fundamentals' in fields:
+            limit = 40  # Default to 10 years of quarterly data
+            if range_str == '1y':
+                limit = 4
+            elif range_str == '2y':
+                limit = 8
+            elif range_str == '5y':
+                limit = 20
+            
+            fundamentals = hub.fundamentals_quarterly(ticker, limit=limit)
+            
+            # Save to file
+            fund_path = market_dir / "fundamentals_quarterly.json"
+            fund_json = fundamentals.model_dump_json(indent=2)
+            fund_path.write_text(fund_json)
+            
+            result['fundamentals'] = str(fund_path)
+            paths.append(str(fund_path))
+            total_bytes += len(fund_json)
+            
+            provenance.append(fundamentals.provenance.model_dump())
+        
+        # Fetch estimates (stub - not implemented yet)
+        if 'estimates' in fields:
+            raise NotImplementedError("Estimates not yet implemented in DataHub")
+        
+        # Save metadata
+        metadata = {
+            'ticker': ticker,
+            'fields': fields,
+            'range': range_str,
+            'point_in_time': point_in_time,
+            'fetched_at': datetime.now().isoformat(),
+            'provenance': provenance
+        }
+        meta_path = market_dir / f"{ticker.lower()}_meta.json"
+        meta_path.write_text(json.dumps(metadata, indent=2))
+        paths.append(str(meta_path))
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': result,
+            'paths': paths,
+            'provenance': provenance,
+            'metrics': {
+                'bytes': total_bytes,
+                't_ms': int(elapsed)
+            },
+            'format': format_type
+        }
+        
+        print(json.dumps(output))
+        
+    except ValidationError as e:
+        output = {
+            'ok': False,
+            'error': 'validation_error',
+            'hint': f"Data validation failed: {str(e)}"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Set FMP_API_KEY environment variable" if "FMP_API_KEY" in str(e) else "Check ticker symbol and API limits"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

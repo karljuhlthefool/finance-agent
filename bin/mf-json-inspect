@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""
+Inspect JSON structure to understand its schema before extraction.
+Returns a tree view of keys, types, and array sizes.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import Any, Dict, List
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def inspect_value(value, max_depth=3, current_depth=0, max_array_sample=3):
+    """
+    Inspect a value and return its structure.
+    Returns: {"type": "...", "keys": [...], "length": ..., "sample": ...}
+    """
+    if current_depth >= max_depth:
+        return {"type": type(value).__name__, "note": "max_depth_reached"}
+    
+    if isinstance(value, dict):
+        keys_info = {}
+        for key in list(value.keys())[:20]:  # Limit to first 20 keys
+            keys_info[key] = inspect_value(value[key], max_depth, current_depth + 1, max_array_sample)
+        
+        return {
+            "type": "object",
+            "keys": list(value.keys()),
+            "key_count": len(value.keys()),
+            "structure": keys_info
+        }
+    
+    elif isinstance(value, list):
+        if len(value) == 0:
+            return {"type": "array", "length": 0, "items": None}
+        
+        # Inspect first few items to understand array structure
+        sample_items = []
+        for item in value[:max_array_sample]:
+            sample_items.append(inspect_value(item, max_depth, current_depth + 1, max_array_sample))
+        
+        # Check if all items have same structure (homogeneous array)
+        is_homogeneous = len(set(json.dumps(item, sort_keys=True) for item in sample_items)) == 1
+        
+        result = {
+            "type": "array",
+            "length": len(value),
+            "is_homogeneous": is_homogeneous,
+            "item_structure": sample_items[0] if sample_items else None
+        }
+        
+        # For array of objects, show available keys
+        if sample_items and isinstance(value[0], dict):
+            all_keys = set()
+            for item in value[:max_array_sample]:
+                if isinstance(item, dict):
+                    all_keys.update(item.keys())
+            result["available_keys"] = sorted(list(all_keys))
+        
+        return result
+    
+    elif isinstance(value, (str, int, float, bool, type(None))):
+        result = {
+            "type": type(value).__name__,
+            "example": value if isinstance(value, (int, float, bool, type(None))) else (value[:50] + "..." if len(str(value)) > 50 else value)
+        }
+        return result
+    
+    else:
+        return {"type": type(value).__name__}
+
+def generate_path_hints(structure, prefix="", hints=None):
+    """
+    Generate suggested paths for accessing data.
+    """
+    if hints is None:
+        hints = []
+    
+    if not isinstance(structure, dict):
+        return hints
+    
+    struct_type = structure.get("type")
+    
+    if struct_type == "object":
+        keys = structure.get("keys", [])
+        for key in keys[:10]:  # Limit hints
+            key_path = f"{prefix}.{key}" if prefix else key
+            hints.append(key_path)
+            
+            # Recurse into nested structures
+            if "structure" in structure and key in structure["structure"]:
+                generate_path_hints(structure["structure"][key], key_path, hints)
+    
+    elif struct_type == "array":
+        # Suggest array access patterns
+        length = structure.get("length", 0)
+        if length > 0:
+            hints.append(f"{prefix}[0]" if prefix else "[0]")  # First item
+            hints.append(f"{prefix}[-1]" if prefix else "[-1]")  # Last item
+            if length > 2:
+                hints.append(f"{prefix}[:3]" if prefix else "[:3]")  # First 3
+            
+            # If array of objects, show paths to fields
+            if structure.get("available_keys"):
+                for key in list(structure["available_keys"])[:5]:
+                    hints.append(f"{prefix}[0].{key}" if prefix else f"[0].{key}")
+    
+    return hints
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        json_file = args.get('json_file')
+        max_depth = args.get('max_depth', 3)
+        show_hints = args.get('show_hints', True)
+        
+        if not json_file:
+            raise ValueError("json_file required")
+        
+        # Load JSON
+        data = json.loads(Path(json_file).read_text())
+        
+        # Inspect structure
+        structure = inspect_value(data, max_depth=max_depth)
+        
+        # Generate path hints
+        hints = []
+        if show_hints:
+            hints = generate_path_hints(structure)[:20]  # Top 20 hints
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        result = {
+            'ok': True,
+            'result': {
+                'structure': structure,
+                'path_hints': hints,
+                'summary': {
+                    'top_level_type': structure.get('type'),
+                    'top_level_keys': structure.get('keys', []),
+                    'total_keys': structure.get('key_count', 0)
+                }
+            },
+            'paths': [],
+            'provenance': [{'source': json_file, 'meta': {'operation': 'inspect'}}],
+            'metrics': {
+                't_ms': int(elapsed),
+                'cost_estimate': 0
+            },
+            'format': 'concise'
+        }
+        
+        print(json.dumps(result))
+        
+    except Exception as e:
+        result = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Provide json_file path. Optional: max_depth (default 3), show_hints (default true)."
+        }
+        print(json.dumps(result))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
