@@ -27,8 +27,16 @@ def agent_options() -> ClaudeAgentOptions:
         "Glob",
         "Grep",
         "mcp__finance-cli-tools__mf_calc_simple",
+        "mcp__finance-cli-tools__mf_doc_diff",
+        "mcp__finance-cli-tools__mf_documents_get",
+        "mcp__finance-cli-tools__mf_estimates_get",
+        "mcp__finance-cli-tools__mf_extract_json",
+        "mcp__finance-cli-tools__mf_filing_extract",
+        "mcp__finance-cli-tools__mf_json_inspect",
         "mcp__finance-cli-tools__mf_market_get",
+        "mcp__finance-cli-tools__mf_qa",
         "mcp__finance-cli-tools__mf_report_save",
+        "mcp__finance-cli-tools__mf_valuation_basic_dcf",
     ]
 
     mcp_servers: Dict[str, object] = {

@@ -50,23 +50,27 @@ uvicorn agent_service.app:app --reload --port 5051
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install   # or: npm install
+pnpm dev       # or: npm run dev
 ```
 
 ---
 
 ## 📦 What's Included
 
-### 7 CLI Tools (all in `bin/`)
+### CLI Tools (all in `bin/`)
 
-1. **`mf-fetch-url`** - Download any URL
-2. **`mf-documents-get`** - Fetch SEC filings (10-K/10-Q/8-K)
-3. **`mf-market-get`** - Get prices, fundamentals, estimates
-4. **`mf-qa`** - LLM-powered Q&A with schema enforcement
-5. **`mf-calc-simple`** - Deltas, growth, sums, averages
-6. **`mf-doc-diff`** - Compare documents/sections
-7. **`mf-valuation-basic-dcf`** - DCF with 3 scenarios
+1. **`mf-documents-get`** – Fetch SEC filings (10-K/10-Q/8-K/20-F/40-F) and persist cleaned text, exhibits, and metadata.
+2. **`mf-filing-extract`** – Extract Item sections or search downloaded filings with keywords/regex while saving snippets.
+3. **`mf-doc-diff`** – Compare two documents/sections with line & character diffs and store JSON summaries.
+4. **`mf-market-get`** – Pull price history or fundamentals from FMP, writing JSON payloads under `data/market/<ticker>/`.
+5. **`mf-estimates-get`** – Retrieve analyst consensus estimates (via CapIQ) with configurable lookback/forward horizons.
+6. **`mf-calc-simple`** – Run deterministic delta/growth/sum/average calculations and optionally persist outputs.
+7. **`mf-valuation-basic-dcf`** – Generate base/bull/bear DCF scenarios with share counts and FCF series.
+8. **`mf-extract-json`** – Extract JSON values via jq-style paths or lightweight LLM-powered instructions.
+9. **`mf-json-inspect`** – Inspect JSON structure, array shapes, and recommended access paths before extraction.
+10. **`mf-qa`** – Perform retrieval-augmented Q&A over filings or inline text with schema-enforced answers.
+11. **`mf-report-save`** – Persist markdown reports/analyses with metadata into the workspace reports directory.
 
 ### Agent Runner
 
