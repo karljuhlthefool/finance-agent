@@ -1,69 +1,147 @@
 import { NextRequest } from 'next/server'
-import { streamText, tool } from 'ai'
-import { z } from 'zod'
+import { StreamingTextResponse } from 'ai'
 
-const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:5051'
+const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:5052'
 
-async function forwardToAgent(payload: unknown) {
+export async function POST(request: NextRequest) {
+  const { messages } = await request.json()
+  
+  const lastMessage = messages[messages.length - 1]
+  const prompt = lastMessage?.content || ''
+
   const response = await fetch(`${AGENT_URL}/query`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ prompt, messages })
   })
 
   if (!response.ok || !response.body) {
     throw new Error(`Agent service responded with ${response.status}`)
   }
 
-  return response.body
-}
-
-const runCalcSimple = tool({
-  description: 'Run deterministic finance calculations (delta, growth, etc.)',
-  parameters: z.object({
-    operation: z.string().default('delta'),
-    current: z.number(),
-    previous: z.number(),
-    mode: z.string().default('percent')
-  }),
-  execute: async ({ operation, current, previous, mode }) => ({
-    forwardToAgent: {
-      tool: 'mf_calc_simple',
-      args: { operation, current, previous, mode }
+  // Parse NDJSON stream and convert to proper AI SDK stream format
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  
+  const transformStream = new TransformStream({
+    async transform(chunk, controller) {
+      // Pass through the chunk
+      controller.enqueue(chunk)
     }
   })
-})
-
-const fetchMarket = tool({
-  description: 'Fetch market data files using mf-market-get',
-  parameters: z.object({
-    ticker: z.string(),
-    fields: z.array(z.string()).default(['prices']),
-    range: z.string().default('1y')
-  }),
-  execute: async ({ ticker, fields, range }) => ({
-    forwardToAgent: {
-      tool: 'mf_market_get',
-      args: { ticker, fields, range }
+  
+  // Track active tool calls to match results with starts
+  const toolCallMap = new Map<string, any>()
+  
+  const stream = new ReadableStream({
+    async start(controller) {
+      let buffer = ''
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) break
+          
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          
+          for (const line of lines) {
+            if (!line.trim()) continue
+            
+            try {
+              const event = JSON.parse(line)
+              
+              // Forward all events from backend
+              if (event.type === 'data') {
+                // Text content goes as text chunks
+                if (event.event === 'agent.text' && event.text) {
+                  const formatted = `0:${JSON.stringify(event.text)}\n`
+                  controller.enqueue(encoder.encode(formatted))
+                } else if (event.event === 'agent.completed' && event.summary) {
+                  const formatted = `0:${JSON.stringify(event.summary)}\n`
+                  controller.enqueue(encoder.encode(formatted))
+                }
+                
+                // Tool start events - track them and send to UI
+                if (event.event === 'agent.tool-start') {
+                  const toolId = event.tool_id
+                  toolCallMap.set(toolId, {
+                    tool: event.tool,
+                    cli_tool: event.cli_tool,
+                    metadata: event.metadata,
+                    args: event.args,
+                  })
+                  
+                  // Send tool-start as data annotation
+                  const dataAnnotation = `2:[${JSON.stringify({
+                    type: 'data',
+                    event: 'agent.tool-start',
+                    tool_id: toolId,
+                    cli_tool: event.cli_tool,
+                    metadata: event.metadata,
+                  })}]\n`
+                  controller.enqueue(encoder.encode(dataAnnotation))
+                }
+                
+                // Tool result events - match with start and send complete info
+                if (event.event === 'agent.tool-result') {
+                  const toolId = event.tool_id
+                  const toolInfo = toolCallMap.get(toolId)
+                  
+                  // Send tool-result with complete context
+                  const dataAnnotation = `2:[${JSON.stringify({
+                    type: 'data',
+                    event: 'agent.tool-result',
+                    tool_id: toolId,
+                    cli_tool: toolInfo?.cli_tool || 'unknown',
+                    metadata: toolInfo?.metadata,
+                    result: event.result,
+                  })}]\n`
+                  controller.enqueue(encoder.encode(dataAnnotation))
+                  
+                  // Clean up
+                  toolCallMap.delete(toolId)
+                }
+                
+                // Tool error events
+                if (event.event === 'agent.tool-error') {
+                  const toolId = event.tool_id
+                  const toolInfo = toolCallMap.get(toolId)
+                  
+                  const dataAnnotation = `2:[${JSON.stringify({
+                    type: 'data',
+                    event: 'agent.tool-error',
+                    tool_id: toolId,
+                    cli_tool: toolInfo?.cli_tool || 'unknown',
+                    error: event.error,
+                  })}]\n`
+                  controller.enqueue(encoder.encode(dataAnnotation))
+                  
+                  toolCallMap.delete(toolId)
+                }
+                
+                // Other log/debug events
+                if (event.event === 'agent.log') {
+                  const dataAnnotation = `2:[${JSON.stringify(event)}]\n`
+                  controller.enqueue(encoder.encode(dataAnnotation))
+                }
+              }
+            } catch (e) {
+              console.error('Failed to parse NDJSON line:', line, e)
+            }
+          }
+        }
+        
+        controller.close()
+      } catch (error) {
+        console.error('Stream error:', error)
+        controller.error(error)
+      }
     }
   })
-})
 
-export async function POST(request: NextRequest) {
-  const { messages } = await request.json()
-
-  const result = await streamText({
-    model: {
-      provider: 'anthropic',
-      model: process.env.ANTHROPIC_MODEL ?? 'claude-3-7-sonnet'
-    },
-    messages,
-    tools: { runCalcSimple, fetchMarket }
-  })
-
-  const pythonStream = await forwardToAgent({ prompt: messages?.at(-1)?.content, messages })
-
-  return result.toDataStreamResponse({
-    data: pythonStream
-  })
+  return new StreamingTextResponse(stream)
 }

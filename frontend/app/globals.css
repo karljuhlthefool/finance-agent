@@ -1,3 +1,22 @@
+@import "tailwindcss";
+
+/* Scale everything down by 30% for compact view */
+body {
+  font-size: 70%;
+  overflow: hidden;
+}
+
+#__next, main {
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Make all containers compact */
+* {
+  font-size: inherit;
+  line-height: 1.3;
+}
+
 :root {
   color-scheme: light dark;
 }
@@ -15,6 +34,16 @@ a {
 
 * {
   box-sizing: border-box;
+}
+
+/* Prevent text selection during resize */
+.resizing {
+  user-select: none;
+  cursor: col-resize !important;
+}
+
+.resizing * {
+  cursor: col-resize !important;
 }
 
 .main-container {
