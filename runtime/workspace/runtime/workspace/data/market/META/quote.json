@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "META",
+    "name": "Meta Platforms, Inc.",
+    "price": 710.56,
+    "changesPercentage": -2.26807,
+    "change": -16.49,
+    "dayLow": 710.19,
+    "dayHigh": 731,
+    "yearHigh": 796.25,
+    "yearLow": 479.8,
+    "marketCap": 1785065309754,
+    "priceAvg50": 752.6934,
+    "priceAvg200": 667.0977,
+    "exchange": "NASDAQ",
+    "volume": 16031961,
+    "avgVolume": 11697406,
+    "open": 729.49,
+    "previousClose": 727.05,
+    "eps": 27.56,
+    "pe": 25.78,
+    "earningsAnnouncement": "2025-10-29T20:00:00.000+0000",
+    "sharesOutstanding": 2512195043,
+    "timestamp": 1759521601
+  }
+]

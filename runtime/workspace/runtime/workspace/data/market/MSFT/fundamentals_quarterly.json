@@ -1,0 +1,59 @@
+{
+  "ticker": "MSFT",
+  "currency": "USD",
+  "pit": true,
+  "quarters": [
+    {
+      "period_end": "2024-09-30",
+      "revenue": "65585000000.0",
+      "net_income": "24667000000.0",
+      "ocf": "34180000000.0",
+      "fcf": "19257000000.0",
+      "shares_diluted": "7470000000.0",
+      "total_assets": "523013000000.0",
+      "total_debt": "61478000000.0",
+      "cash": "20840000000.0"
+    },
+    {
+      "period_end": "2024-12-31",
+      "revenue": "69632000000.0",
+      "net_income": "24108000000.0",
+      "ocf": "22291000000.0",
+      "fcf": "6487000000.0",
+      "shares_diluted": "7468000000.0",
+      "total_assets": "533898000000.0",
+      "total_debt": "62224000000.0",
+      "cash": "17482000000.0"
+    },
+    {
+      "period_end": "2025-03-31",
+      "revenue": "70066000000.0",
+      "net_income": "25824000000.0",
+      "ocf": "37044000000.0",
+      "fcf": "20299000000.0",
+      "shares_diluted": "7461000000.0",
+      "total_assets": "562624000000.0",
+      "total_debt": "60567000000.0",
+      "cash": "28828000000.0"
+    },
+    {
+      "period_end": "2025-06-30",
+      "revenue": "76441000000.0",
+      "net_income": "27233000000.0",
+      "ocf": "42647000000.0",
+      "fcf": "25568000000.0",
+      "shares_diluted": "7465000000.0",
+      "total_assets": "619003000000.0",
+      "total_debt": "60588000000.0",
+      "cash": "30242000000.0"
+    }
+  ],
+  "provenance": {
+    "source": "FMP",
+    "fetched_at": "2025-10-04T08:19:00.482184",
+    "meta": {
+      "endpoint": "financial-statements",
+      "period": "quarterly"
+    }
+  }
+}

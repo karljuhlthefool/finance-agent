@@ -1,0 +1,40 @@
+{
+  "ticker": "AAPL",
+  "metric_type": "revenue",
+  "currency": "USD",
+  "points": [
+    {
+      "period": "IQ_FY+1",
+      "value": "415273.96393",
+      "num_estimates": 41
+    },
+    {
+      "period": "IQ_FY+2",
+      "value": "438145.97876",
+      "num_estimates": 43
+    },
+    {
+      "period": "IQ_FY+3",
+      "value": "465290.84978",
+      "num_estimates": 22
+    },
+    {
+      "period": "IQ_FY+4",
+      "value": "488802.16667",
+      "num_estimates": 6
+    },
+    {
+      "period": "IQ_FY+5",
+      "value": "525702.33333",
+      "num_estimates": 3
+    }
+  ],
+  "provenance": {
+    "source": "CapIQ",
+    "fetched_at": null,
+    "meta": {
+      "estimate_type": "revenue",
+      "years_future": 5
+    }
+  }
+}

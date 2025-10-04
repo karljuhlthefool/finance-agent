@@ -11,7 +11,7 @@ type ProgressIndicatorProps = {
   className?: string
 }
 
-export default function ProgressIndicator({ 
+export function ProgressIndicator({ 
   type, 
   value, 
   max = 100, 

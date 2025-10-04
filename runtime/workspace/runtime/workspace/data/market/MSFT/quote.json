@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "MSFT",
+    "name": "Microsoft Corporation",
+    "price": 517.35,
+    "changesPercentage": 0.31217,
+    "change": 1.61,
+    "dayLow": 515,
+    "dayHigh": 520.49,
+    "yearHigh": 555.45,
+    "yearLow": 344.79,
+    "marketCap": 3845548626176,
+    "priceAvg50": 512.9662,
+    "priceAvg200": 451.97504,
+    "exchange": "NASDAQ",
+    "volume": 15058411,
+    "avgVolume": 20070398,
+    "open": 517.1,
+    "previousClose": 515.74,
+    "eps": 13.62,
+    "pe": 37.98,
+    "earningsAnnouncement": "2025-10-29T20:00:00.000+0000",
+    "sharesOutstanding": 7433166379,
+    "timestamp": 1759521601
+  }
+]

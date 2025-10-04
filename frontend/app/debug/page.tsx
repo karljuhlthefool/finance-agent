@@ -13,7 +13,7 @@ export default function DebugPage() {
     setRawData([])
     
     try {
-      const res = await fetch('http://localhost:5052/query', {
+      const res = await fetch('http://127.0.0.1:5052/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'Say hello briefly' })
@@ -69,20 +69,40 @@ export default function DebugPage() {
 
       const reader = res.body?.getReader()
       const decoder = new TextDecoder()
-      let text = ''
+      let buffer = ''
+      let fullText = ''
+      const parsedData: any[] = []
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          text += decoder.decode(value, { stream: false })
+          
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.trim()) continue
+            
+            // Parse AI SDK stream format: "0:text" or "2:[data]"
+            if (line.startsWith('0:')) {
+              const text = JSON.parse(line.slice(2))
+              fullText += text
+              parsedData.push({ type: 'text', text })
+            } else if (line.startsWith('2:')) {
+              const data = JSON.parse(line.slice(2))
+              parsedData.push({ type: 'data', data })
+            }
+          }
         }
       }
 
-      setResponse(text || '(empty response)')
-      setRawData([{ type: 'text', content: text }])
+      setResponse(fullText || '(empty response)')
+      setRawData(parsedData)
     } catch (error: any) {
       setResponse('✗ Error: ' + error.message)
+      console.error('Frontend API test error:', error)
     } finally {
       setLoading(false)
     }

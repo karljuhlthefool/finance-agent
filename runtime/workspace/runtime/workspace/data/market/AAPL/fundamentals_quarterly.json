@@ -1,0 +1,59 @@
+{
+  "ticker": "AAPL",
+  "currency": "USD",
+  "pit": true,
+  "quarters": [
+    {
+      "period_end": "2024-09-28",
+      "revenue": "94930000000.0",
+      "net_income": "14736000000.0",
+      "ocf": "26811000000.0",
+      "fcf": "23903000000.0",
+      "shares_diluted": "15242853000.0",
+      "total_assets": "364980000000.0",
+      "total_debt": "119059000000.0",
+      "cash": "29943000000.0"
+    },
+    {
+      "period_end": "2024-12-28",
+      "revenue": "124300000000.0",
+      "net_income": "36330000000.0",
+      "ocf": "29935000000.0",
+      "fcf": "26995000000.0",
+      "shares_diluted": "15150865000.0",
+      "total_assets": "344085000000.0",
+      "total_debt": "96799000000.0",
+      "cash": "30299000000.0"
+    },
+    {
+      "period_end": "2025-03-29",
+      "revenue": "95359000000.0",
+      "net_income": "24780000000.0",
+      "ocf": "23952000000.0",
+      "fcf": "20881000000.0",
+      "shares_diluted": "15056133000.0",
+      "total_assets": "331233000000.0",
+      "total_debt": "98186000000.0",
+      "cash": "28162000000.0"
+    },
+    {
+      "period_end": "2025-06-28",
+      "revenue": "94036000000.0",
+      "net_income": "23434000000.0",
+      "ocf": "27867000000.0",
+      "fcf": "24405000000.0",
+      "shares_diluted": "14948179000.0",
+      "total_assets": "331495000000.0",
+      "total_debt": "101698000000.0",
+      "cash": "30465000000.0"
+    }
+  ],
+  "provenance": {
+    "source": "FMP",
+    "fetched_at": "2025-10-04T09:18:53.877282",
+    "meta": {
+      "endpoint": "financial-statements",
+      "period": "quarterly"
+    }
+  }
+}

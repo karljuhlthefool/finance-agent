@@ -92,8 +92,20 @@ async def _event_stream(prompt: str, history: Any | None) -> AsyncIterator[str]:
     try:
         async for message in claude_query(prompt=prompt, options=opts):
             log("debug", f"📨 Received message type: {type(message).__name__}")
-            async for line in _convert_message_to_events(message):
-                yield json.dumps(line, ensure_ascii=False) + "\n"
+            async for event_dict in _convert_message_to_events(message):
+                # Log the exact dict being sent (for debugging)
+                if event_dict.get("event") == "agent.tool-start":
+                    log("info", f"🔍 Sending tool-start event", {
+                        "keys": list(event_dict.keys()),
+                        "has_tool": "tool" in event_dict,
+                        "has_args": "args" in event_dict,
+                        "tool": event_dict.get("tool"),
+                        "args_preview": str(event_dict.get("args"))[:100] if "args" in event_dict else None
+                    })
+                
+                # Format as NDJSON (newline-delimited JSON)
+                json_str = json.dumps(event_dict, ensure_ascii=False)
+                yield f"{json_str}\n"
         
         log("info", "✅ Query completed successfully")
     except Exception as e:
@@ -105,7 +117,7 @@ async def _event_stream(prompt: str, history: Any | None) -> AsyncIterator[str]:
             "error": str(e),
             "error_type": type(e).__name__
         }
-        yield json.dumps(error_msg, ensure_ascii=False) + "\n"
+        yield f"{json.dumps(error_msg, ensure_ascii=False)}\n"
 
 
 async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, Any]]:
@@ -151,13 +163,27 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                 result_content = getattr(block, "content", None)
                 is_error = getattr(block, "is_error", False)
                 
-                # Try to parse the result
+                # Try to parse the result - handle both string and list of content blocks
                 result_data = result_content
                 if isinstance(result_content, str):
                     try:
                         result_data = json.loads(result_content)
                     except:
                         result_data = result_content[:500]  # Truncate long text
+                elif isinstance(result_content, list) and len(result_content) > 0:
+                    # MCP tools return [{"type": "json", "json": {...}}]
+                    first_block = result_content[0]
+                    if isinstance(first_block, dict):
+                        # If it's a JSON block, extract the json field
+                        if first_block.get("type") == "json" and "json" in first_block:
+                            result_data = first_block["json"]
+                        elif "text" in first_block:
+                            result_data = first_block["text"]
+                    elif hasattr(first_block, 'json'):
+                        # SDK ContentBlock objects
+                        result_data = first_block.json
+                    elif hasattr(first_block, 'text'):
+                        result_data = first_block.text
                 
                 # Log the result
                 if is_error:
@@ -205,6 +231,13 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                 tool_args = block.input
                 tool_id = getattr(block, "id", "unknown")
                 
+                log("debug", f"📋 Tool args RAW", {
+                    "tool": tool_name,
+                    "args_type": str(type(tool_args)),
+                    "args": tool_args,
+                    "args_keys": list(tool_args.keys()) if isinstance(tool_args, dict) else None
+                })
+                
                 # Detect CLI tool if this is a Bash command
                 cli_tool = None
                 metadata = {}
@@ -217,8 +250,10 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                         "mf-valuation-basic-dcf", "mf-report-save",
                         "mf-extract-json", "mf-json-inspect", "mf-doc-diff",
                     ]
+                    
+                    # Check for tool names (with or without dashes/underscores)
                     for tool in cli_tools:
-                        if tool in command:
+                        if tool in command or tool.replace('-', '_') in command:
                             cli_tool = tool
                             break
                     
@@ -238,6 +273,10 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                     "metadata": metadata
                 })
                 
+                # For CLI tools, use metadata (which has parsed JSON args) as args
+                # For other tools, use tool_args directly
+                display_args = metadata if cli_tool else tool_args
+                
                 yield {
                     "type": "data",
                     "event": "agent.tool-start",
@@ -245,7 +284,7 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                     "tool_id": tool_id,
                     "cli_tool": cli_tool,
                     "metadata": metadata,
-                    "args": tool_args,
+                    "args": display_args,
                 }
     
     # Handle ResultMessage (final completion)
@@ -313,6 +352,19 @@ def _scan_workspace_tree(root: Path, relative_to: Path, max_depth: int = 10, cur
             # Prevent nested workspace duplication: skip 'runtime' directory at root level
             # This prevents runtime/workspace/runtime/workspace nesting
             if relative_path == 'runtime' and current_depth == 0:
+                continue
+            
+            # Filter out unnecessary files from workspace viewer
+            # Skip binary cache files
+            if item.is_file() and item.suffix == '.bin':
+                continue
+            
+            # Skip base64-encoded URL cache files (long hashes)
+            if item.is_file() and len(item.stem) > 50:
+                continue
+            
+            # Skip internal SDK reports
+            if item.name == 'claude_agent_sdk_report.json':
                 continue
             
             try:

@@ -2,36 +2,10 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
-import ReactMarkdown from 'react-markdown'
-import LogsCard from '@/components/cards/LogsCard'
-import ReportCard from '@/components/cards/ReportCard'
-import GenericToolCard from '@/components/cards/GenericToolCard'
-import MarketDataCard from '@/components/cards/MarketDataCard'
-import ValuationCard from '@/components/cards/ValuationCard'
-import CalculationCard from '@/components/cards/CalculationCard'
-import { QACard } from '@/components/cards/QACard'
-import { FilingExtractCard } from '@/components/cards/FilingExtractCard'
-import { EstimatesCard } from '@/components/cards/EstimatesCard'
-import ToolChainFlow from '@/components/agent/ToolChainFlow'
-import AgentThinkingBubble from '@/components/agent/AgentThinkingBubble'
-import SessionTimeline from '@/components/agent/SessionTimeline'
+import { useToolStore } from '@/lib/tool-store'
+import { ToolChainGroup } from '@/components/agent/ToolChainGroup'
 import { useWorkspace } from '@/lib/workspace-context'
 import WorkspacePanel from '@/components/workspace/WorkspacePanel'
-
-type ToolResult = {
-  ok?: boolean
-  data?: any
-  error?: string
-  tool?: string
-}
-
-type AgentDataPart = {
-  type: 'data'
-  event: string
-  [key: string]: any
-}
-
-type MessagePart = AgentDataPart | { type: string; text?: string }
 
 export default function Page() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -46,335 +20,204 @@ export default function Page() {
     }
   })
 
+  // Get tool store actions
+  const addTool = useToolStore((state) => state.addTool)
+  const updateTool = useToolStore((state) => state.updateTool)
+  const setPhase = useToolStore((state) => state.setPhase)
+  const setResult = useToolStore((state) => state.setResult)
+  const tools = useToolStore((state) => state.tools)
+
   // Auto-scroll to bottom when messages or data updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, data])
 
-  // Track tool states (loading → result)
-  const [toolStates, setToolStates] = useState<Record<string, any>>({})
-  const [toolChain, setToolChain] = useState<any[]>([])
-  const [sessionHistory, setSessionHistory] = useState<any[]>([])
-  const [agentThinking, setAgentThinking] = useState<any>(null)
+  // Track last agent text for description (using ref to avoid stale closures)
+  const lastAgentTextRef = useRef<string | null>(null)
+  // Track processed events to prevent reprocessing
+  const processedEventsRef = useRef<Set<string>>(new Set())
   
-  // Update tool states when data changes
+  // Process streaming data to update tool states
   useEffect(() => {
-    const states: Record<string, any> = {}
-    const chain: any[] = []
-    let thinking: any = null
+    console.log('🔄 useEffect triggered, data length:', data?.length)
+    console.log('🔄 Full data array:', JSON.stringify(data, null, 2))
     
-    data?.forEach((item: any) => {
-      if (item.type === 'data') {
-        // Handle tool start
-        if (item.event === 'agent.tool-start') {
-          states[item.tool_id] = {
-            toolId: item.tool_id,
-            cli_tool: item.cli_tool,
-            metadata: item.metadata,
-            isLoading: true,
-            status: 'active'
-          }
-          chain.push({
-            id: item.tool_id,
-            name: item.tool || 'Tool',
-            cli_tool: item.cli_tool || 'unknown',
-            status: 'active',
-            progress: item.progress
+    data?.forEach((event: any, index: number) => {
+      // Create unique key for each event
+      const eventKey = `${index}-${event.event}-${event.tool_id || event.text?.slice(0, 20) || Math.random()}`
+      
+      // Skip if already processed
+      if (processedEventsRef.current.has(eventKey)) {
+        console.log(`  ⏭️ Skipping already processed event ${index}`)
+        return
+      }
+      
+      // Mark as processed
+      processedEventsRef.current.add(eventKey)
+      
+      if (event.type === 'data') {
+        console.log(`📦 Processing NEW event ${index}:`, event.event, event.tool_id || '')
+        
+        // Agent text (might be description for next tool)
+        if (event.event === 'agent.text') {
+          const text = event.text?.trim()
+          const wordCount = text ? text.split(' ').length : 0
+          console.log('  💬 Agent text received:', {
+            text: text,
+            wordCount: wordCount,
+            willCapture: text && wordCount <= 12
           })
-        } 
-        // Handle tool result
-        else if (item.event === 'agent.tool-result') {
-          const existing = states[item.tool_id] || {}
-          states[item.tool_id] = {
-            ...existing,
-            toolId: item.tool_id,
-            cli_tool: item.cli_tool || existing.cli_tool,
-            metadata: item.metadata || existing.metadata,
-            result: item.result,
-            isLoading: false,
-            status: 'complete'
-          }
           
-          // Update chain
-          const chainItem = chain.find(c => c.id === item.tool_id)
-          if (chainItem) {
-            chainItem.status = 'complete'
-            chainItem.duration = item.duration || 1000
-          }
-          
-          // Add to history
-          setSessionHistory(prev => [...prev, {
-            time: new Date().toLocaleTimeString(),
-            tool: item.cli_tool || 'Tool',
-            ticker: item.metadata?.ticker,
-            status: 'complete',
-            duration: item.duration
-          }])
-        } 
-        // Handle tool error
-        else if (item.event === 'agent.tool-error') {
-          const existing = states[item.tool_id] || {}
-          states[item.tool_id] = {
-            ...existing,
-            toolId: item.tool_id,
-            cli_tool: item.cli_tool || existing.cli_tool,
-            error: item.error,
-            isLoading: false,
-            status: 'error'
-          }
-          
-          const chainItem = chain.find(c => c.id === item.tool_id)
-          if (chainItem) chainItem.status = 'error'
-        }
-        // Handle thinking event
-        else if (item.event === 'agent.thinking') {
-          thinking = {
-            message: item.message,
-            plan: item.plan
+          if (text && wordCount <= 12) {
+            // If it's short (< 12 words), it's likely a description
+            lastAgentTextRef.current = text
+            console.log('  ✅ Captured as potential description!', text)
+          } else {
+            // Long text, clear description
+            lastAgentTextRef.current = null
+            console.log('  ❌ Not captured (too long or empty)', { wordCount })
           }
         }
+        
+        // Tool started
+        else if (event.event === 'agent.tool-start') {
+          console.log('  🔧 TOOL START detected:', event.tool_id, event.cli_tool)
+          console.log('  📋 EVENT RAW:', JSON.stringify(event, null, 2))
+          console.log('  🎯 KEY CHECK:', {
+            hasToolField: 'tool' in event,
+            hasArgsField: 'args' in event,
+            tool: event.tool,
+            args: event.args,
+            metadata: event.metadata
+          })
+          
+          console.log('  🎯 ATTACHING DESCRIPTION:', {
+            lastAgentText: lastAgentTextRef.current,
+            willAttach: !!lastAgentTextRef.current
+          })
+          
+          addTool(event.tool_id, {
+            tool: event.tool,
+            cliTool: event.cli_tool,
+            metadata: event.metadata,
+            args: event.args,
+            description: lastAgentTextRef.current || undefined, // Attach description if we have one
+            phase: 'intent',
+          })
+          
+          console.log('  ✅ Tool added with description:', lastAgentTextRef.current ? `"${lastAgentTextRef.current}"` : '(none)')
+          
+          // Clear description after using it
+          lastAgentTextRef.current = null
+          
+          // Transition to executing after brief intent display
+          // Use a flag-based approach instead of setTimeout
+          const toolId = event.tool_id
+          setTimeout(() => {
+            console.log('  ⏩ Attempting transition to executing:', toolId)
+            // setPhaseIfStillIntent will only transition if phase is still 'intent'
+            setPhase(toolId, 'executing', true) // true = conditional
+          }, 150)
+        }
+        
+        // Tool completed
+        else if (event.event === 'agent.tool-result') {
+          console.log('  ✅ TOOL RESULT detected:', event.tool_id)
+          console.log('  📄 Result data:', event.result)
+          setResult(event.tool_id, event.result)
+          console.log('  ✓ setResult called for:', event.tool_id)
+        }
+        
+        // Tool error
+        else if (event.event === 'agent.tool-error') {
+          console.log('  ❌ TOOL ERROR detected:', event.tool_id, event.error)
+          setResult(event.tool_id, {
+            ok: false,
+            error: event.error,
+          })
+          console.log('  ✓ setResult (error) called for:', event.tool_id)
+        }
+      } else {
+        console.log('  ⚠️  Event type is NOT "data":', event.type)
       }
     })
-    
-    setToolStates(states)
-    setToolChain(chain)
-    setAgentThinking(thinking)
-  }, [data])
-  
-  const renderToolCard = (toolState: any, idx: number) => {
-    const { cli_tool, metadata, result, error, isLoading, toolId } = toolState
-    
-    // Route to specialized components based on CLI tool type
-    switch (cli_tool) {
-      case 'mf-market-get':
-        return (
-          <MarketDataCard
-            key={toolId}
-            toolId={toolId}
-            metadata={metadata}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      case 'mf-valuation-basic-dcf':
-        return (
-          <ValuationCard
-            key={toolId}
-            toolId={toolId}
-            metadata={metadata}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      case 'mf-calc-simple':
-        return (
-          <CalculationCard
-            key={toolId}
-            toolId={toolId}
-            metadata={metadata}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      case 'mf-estimates-get':
-        return (
-          <EstimatesCard
-            key={toolId}
-            toolCall={{ tool_id: toolId, cli_tool, metadata }}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      case 'mf-qa':
-        return (
-          <QACard
-            key={toolId}
-            toolCall={{ tool_id: toolId, cli_tool, metadata }}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      case 'mf-filing-extract':
-        return (
-          <FilingExtractCard
-            key={toolId}
-            toolCall={{ tool_id: toolId, cli_tool, metadata }}
-            result={result}
-            isLoading={isLoading}
-          />
-        )
-      
-      default:
-        // Fallback to generic card
-        return (
-          <GenericToolCard
-            key={toolId}
-            tool={cli_tool || 'unknown'}
-            payload={result || { error, isLoading }}
-          />
-        )
-    }
-  }
-
-  const renderPart = (part: MessagePart, idx: number) => {
-    if (part.type === 'data') {
-      switch (part.event) {
-        case 'agent.tool-result.mf_calc_simple':
-          return <ReportCard key={idx} result={part.result as ToolResult} />
-        case 'agent.tool-start':
-        case 'agent.tool-result':
-        case 'agent.tool-error':
-        case 'agent.thinking':
-          // These are handled by toolStates rendering
-          return null
-        case 'agent.log':
-          return <LogsCard key={idx} lines={part.lines ?? []} />
-        case 'agent.text':
-          return (
-            <p key={idx} className="leading-relaxed text-slate-800">
-              {part.text}
-            </p>
-          )
-        case 'agent.completed':
-          return (
-            <div key={idx} className="text-xs text-slate-500">
-              ✅ Completed in {part.runtime_ms ?? '–'} ms
-            </div>
-          )
-        default:
-          return <GenericToolCard key={idx} tool={part.event} payload={part} />
-      }
-    }
-
-    if (part.type === 'tool' && (part as any).state === 'result') {
-      return (
-        <GenericToolCard key={idx} tool={(part as any).name ?? 'tool'} payload={(part as any).result} />
-      )
-    }
-
-    if (part.type === 'text' || part.type === 'text-delta') {
-      return (
-        <p key={idx} className="leading-relaxed text-slate-800">
-          {part.text}
-        </p>
-      )
-    }
-
-    return null
-  }
+  }, [data, addTool, setPhase, setResult])
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-slate-50">
       {/* Main content area */}
       <main 
-        className="flex-1 flex flex-col gap-3 p-4 transition-all duration-300 max-w-4xl mx-auto text-sm"
+        className="flex-1 flex flex-col gap-3 p-4 transition-all duration-300 max-w-4xl mx-auto"
       >
-        {/* Session Timeline */}
-        <SessionTimeline 
-        entries={sessionHistory}
-        onRerun={(entry) => {
-          if (entry.ticker) {
-            setInput(`Get data for ${entry.ticker}`)
-          }
-        }}
-      />
-      
-      <header className="rounded-xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200">
+        <header className="rounded-xl bg-white p-4 shadow-sm border border-slate-200">
         <h1 className="text-lg font-semibold text-slate-900">Claude Finance Agent</h1>
         <p className="mt-1 text-xs text-slate-600">
-          Chat with the agent and watch CLI-backed tool cards stream in real time.
-        </p>
-        <div className="mt-2 flex items-center gap-3 text-xs">
-          <span className="text-slate-500">Messages: {messages.length}</span>
-          <span className="text-slate-500">Loading: {isLoading ? 'Yes' : 'No'}</span>
-          <a href="/debug" className="text-blue-600 hover:underline">Debug Page →</a>
+            Ask questions and watch tools execute in real-time
+          </p>
+          <div className="mt-2 flex items-center gap-3 text-xs text-slate-500">
+            <span>Messages: {messages.length}</span>
+            <span>•</span>
+            <span>Tools: {Object.keys(tools).length}</span>
+            <span>•</span>
+            <span>{isLoading ? '⏳ Processing...' : '✓ Ready'}</span>
         </div>
       </header>
 
-      <section className="flex-1 space-y-2 overflow-y-auto pr-1"
-        style={{ maxHeight: 'calc(100vh - 180px)' }}
-      >
-        {messages.map((message, msgIdx) => {
-          // Get data annotations for this message
-          const messageData = data?.filter((d: any) => {
-            return true // For now, show all data items with the latest message
-          })
-          
-          return (
-            <article key={message.id} className="rounded-xl bg-white p-3 shadow ring-1 ring-slate-200">
+        <section 
+          className="flex-1 space-y-3 overflow-y-auto"
+          style={{ maxHeight: 'calc(100vh - 200px)' }}
+        >
+          {messages.map((message) => (
+            <article 
+              key={message.id} 
+              className="rounded-xl bg-white p-4 shadow-sm border border-slate-200"
+            >
               <div className="mb-2 text-xs font-semibold uppercase text-slate-500">
                 {message.role}
               </div>
-            <div className="space-y-3">
-                {/* Show thinking bubble if agent is thinking */}
-                {message.role === 'assistant' && msgIdx === messages.length - 1 && agentThinking && (
-                  <AgentThinkingBubble 
-                    message={agentThinking.message}
-                    plan={agentThinking.plan}
-                  />
+              
+              <div className="space-y-3">
+                {/* Show tool chain for assistant messages */}
+                {message.role === 'assistant' && Object.keys(tools).length > 0 && (
+                  <ToolChainGroup toolIds={Object.keys(tools)} />
                 )}
                 
-                {/* Show tool chain if we have tools executing */}
-                {message.role === 'assistant' && msgIdx === messages.length - 1 && toolChain.length > 0 && (
-                  <ToolChainFlow tools={toolChain} />
-                )}
-                
-                {/* Render tool cards based on tool states */}
-                {message.role === 'assistant' && msgIdx === messages.length - 1 && Object.entries(toolStates).map(([toolId, toolState]) => {
-                  return renderToolCard(toolState, parseInt(toolId))
-                })}
-                
-                {/* Show other data annotations (non-tool events) */}
-                {message.role === 'assistant' && msgIdx === messages.length - 1 && messageData?.map((dataItem: any, idx: number) => {
-                  if (dataItem.type === 'data') {
-                    return renderPart(dataItem as MessagePart, `data-${idx}`)
-                  }
-                  return null
-                })}
-                
+                {/* Show text content */}
                 {message.content && (
-                  <div className="prose prose-slate prose-sm max-w-none prose-headings:font-semibold prose-p:leading-7 prose-ul:list-disc prose-ul:pl-5 prose-ol:list-decimal prose-ol:pl-5 prose-li:my-1">
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => <p className="mb-4 whitespace-pre-wrap">{children}</p>,
-                        ul: ({ children }) => <ul className="mb-4 list-disc space-y-1 pl-5">{children}</ul>,
-                        ol: ({ children }) => <ol className="mb-4 list-decimal space-y-1 pl-5">{children}</ol>,
-                        li: ({ children }) => <li className="leading-7">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                        h1: ({ children }) => <h1 className="mb-2 mt-3 text-base font-bold">{children}</h1>,
-                        h2: ({ children }) => <h2 className="mb-2 mt-2 text-sm font-semibold">{children}</h2>,
-                        h3: ({ children }) => <h3 className="mb-1 mt-2 text-sm font-semibold">{children}</h3>,
-                      }}
-                    >
+                  <div className="prose prose-sm max-w-none">
+                    <div className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
                       {message.content}
-                    </ReactMarkdown>
+                    </div>
                   </div>
                 )}
-              {message.parts?.map((part, idx) => renderPart(part as MessagePart, idx))}
-                {!message.content && !message.parts && messageData?.length === 0 && (
-                  <pre className="text-xs text-slate-400">
-                    {JSON.stringify(message, null, 2)}
-                  </pre>
-                )}
-            </div>
-          </article>
-          )
-        })}
+              </div>
+            </article>
+          ))}
 
         {!messages.length && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-sm text-slate-500">
-            Ask about a ticker, run a valuation, or request a report to see tool cards populate.
+            <div className="rounded-xl border-2 border-dashed border-slate-300 bg-white/60 p-8 text-center">
+              <div className="text-4xl mb-3">💬</div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                Start a Conversation
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Ask about stocks, run valuations, analyze filings, or request reports
+              </p>
+              <div className="space-y-2 text-xs text-left max-w-md mx-auto">
+                <div className="text-slate-500 font-medium">Try asking:</div>
+                <div className="space-y-1 text-slate-600">
+                  <div>• &ldquo;Get market data for Apple&rdquo;</div>
+                  <div>• &ldquo;Run a DCF valuation on MSFT&rdquo;</div>
+                  <div>• &ldquo;What are Tesla&apos;s main risk factors?&rdquo;</div>
+                  <div>• &ldquo;Compare revenue growth for GOOGL and META&rdquo;</div>
+                </div>
+              </div>
           </div>
         )}
 
         {/* Loading indicator */}
         {isLoading && (
-          <article className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 shadow ring-1 ring-blue-100">
+            <article className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 shadow-sm border border-blue-200">
             <div className="flex items-center gap-3">
               <div className="flex gap-1.5">
                 <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:-0.3s]"></div>
@@ -382,7 +225,7 @@ export default function Page() {
                 <div className="h-2 w-2 animate-bounce rounded-full bg-blue-500"></div>
               </div>
               <p className="text-xs font-medium text-blue-900">
-                Agent is thinking and processing...
+                  Agent is thinking...
               </p>
             </div>
           </article>
@@ -393,7 +236,7 @@ export default function Page() {
       </section>
 
       <form
-        className="sticky bottom-6 flex gap-3 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-slate-200"
+          className="sticky bottom-0 flex gap-3 rounded-2xl bg-white p-4 shadow-lg border border-slate-200"
         onSubmit={async (event: FormEvent<HTMLFormElement>) => {
           event.preventDefault()
           if (!input.trim() || isLoading) return
@@ -405,20 +248,21 @@ export default function Page() {
         <input
           value={input}
           onChange={event => setInput(event.target.value)}
-          placeholder="Ask the agent to run a CLI tool..."
-          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+            placeholder="Ask the agent anything..."
+            className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
           disabled={isLoading}
         />
         <button
           type="submit"
-          className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-slate-800 transition-all"
+            className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            disabled={isLoading || !input.trim()}
         >
           Send
         </button>
       </form>
     </main>
       
-      {/* Workspace Panel - shares page space */}
+      {/* Workspace Panel */}
       <WorkspacePanel />
     </div>
   )

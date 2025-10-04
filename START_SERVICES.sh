@@ -29,7 +29,7 @@ fi
 echo ""
 echo "🚀 Starting Backend (Port 5052)..."
 source venv/bin/activate
-nohup uvicorn agent_service.app:app --reload --port 5052 > /tmp/backend_output.log 2>&1 &
+nohup uvicorn agent_service.app:app --reload --host 0.0.0.0 --port 5052 > /tmp/backend_output.log 2>&1 &
 BACKEND_PID=$!
 echo "   Backend PID: $BACKEND_PID"
 
@@ -51,6 +51,8 @@ done
 echo ""
 echo "🚀 Starting Frontend (Port 3031)..."
 cd frontend
+# Clear Next.js cache to avoid stale env variables
+rm -rf .next 2>/dev/null || true
 nohup npm run dev -- -p 3031 > /tmp/frontend_output.log 2>&1 &
 FRONTEND_PID=$!
 cd ..

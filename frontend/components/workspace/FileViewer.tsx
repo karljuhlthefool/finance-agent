@@ -17,7 +17,7 @@ type FileContent = {
   error?: string
 }
 
-const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || 'http://localhost:5052'
+const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL || 'http://127.0.0.1:5052'
 
 function JsonViewer({ content }: { content: string }) {
   try {

@@ -45,6 +45,7 @@ def agent_options() -> ClaudeAgentOptions:
 
     return ClaudeAgentOptions(
         cwd=str(DEFAULT_WORKSPACE),
+        model="claude-3-5-haiku-20241022",  # Haiku for fast, cheap testing
         system_prompt=system_prompt,
         allowed_tools=allowed_tools,
         mcp_servers=mcp_servers,

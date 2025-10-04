@@ -1,0 +1,11 @@
+{
+  "ticker": "NVDA",
+  "fields": [
+    "quote"
+  ],
+  "range": "1y",
+  "period": "annual",
+  "limit": null,
+  "fetched_at": "2025-10-04T11:50:24.030742",
+  "provenance": []
+}
