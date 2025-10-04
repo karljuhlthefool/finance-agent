@@ -1,0 +1,24 @@
+{
+  "ticker": "AAPL",
+  "fields": [
+    "prices",
+    "key_metrics",
+    "ratios",
+    "growth",
+    "analyst_estimates",
+    "segments_product"
+  ],
+  "range": "5y",
+  "period": "annual",
+  "limit": 5,
+  "fetched_at": "2025-10-04T13:44:32.332264",
+  "provenance": [
+    {
+      "source": "FMP",
+      "fetched_at": "2025-10-04T11:44:29.693137",
+      "meta": {
+        "endpoint": "historical-price-full"
+      }
+    }
+  ]
+}

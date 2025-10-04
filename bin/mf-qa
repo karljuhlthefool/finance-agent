@@ -150,7 +150,7 @@ def main():
                 raise ValueError(f"Schema validation failed: output is not valid JSON. {str(e)}")
         
         # Save result to file - use .json for structured, .md for unstructured
-        output_dir = WORKSPACE / "outputs" / "answers"
+        output_dir = WORKSPACE / "artifacts" / "answers"
         output_dir.mkdir(parents=True, exist_ok=True)
         
         timestamp = datetime.now().isoformat().replace(':', '-').split('.')[0]

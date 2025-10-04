@@ -175,7 +175,7 @@ def main():
         provenance = []
         total_bytes = 0
         
-        market_dir = WORKSPACE / "data" / "market" / ticker
+        market_dir = WORKSPACE / "raw" / "market" / ticker
         market_dir.mkdir(parents=True, exist_ok=True)
         
         # Fetch prices

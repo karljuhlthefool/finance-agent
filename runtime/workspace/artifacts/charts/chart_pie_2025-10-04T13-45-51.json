@@ -1,0 +1,38 @@
+{
+  "type": "pie",
+  "data": [
+    {
+      "name": "iPhone",
+      "value": 200.5
+    },
+    {
+      "name": "Mac",
+      "value": 29.4
+    },
+    {
+      "name": "iPad",
+      "value": 28.3
+    },
+    {
+      "name": "Wearables",
+      "value": 37.0
+    },
+    {
+      "name": "Services",
+      "value": 85.2
+    }
+  ],
+  "title": "AAPL Revenue by Segment (FY2024)",
+  "xLabel": null,
+  "yLabel": null,
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

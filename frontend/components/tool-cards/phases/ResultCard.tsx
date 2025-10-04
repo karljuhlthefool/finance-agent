@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useToolStore } from '@/lib/tool-store'
 import { MarketDataResult } from '../tool-specific/MarketDataResult'
 import { GenericResult } from '../tool-specific/GenericResult'
+import { ChartResult } from '../tool-specific/ChartResult'
+import { MetricsGrid } from '@/components/visualizations/MetricsGrid'
 import { useWorkspace } from '@/lib/workspace-context'
 
 interface ResultCardProps {
@@ -55,6 +57,37 @@ export function ResultCard({
   
   // Route to tool-specific result component
   const renderToolResult = () => {
+    // Check for UI component format (visual components like MetricsGrid)
+    if (result?.format === 'ui_component' && result?.result?.component) {
+      const componentType = result.result.component
+      const renderData = result.result.render_data
+      const uiId = result.result.ui_id
+
+      switch (componentType) {
+        case 'metrics_grid':
+          return (
+            <MetricsGrid
+              data={renderData}
+              ui_id={uiId}
+            />
+          )
+
+        default:
+          // Unknown UI component, fall through to generic
+          break
+      }
+    }
+    
+    // Check for chart format (regular chart data)
+    if (result?.format === 'chart' || cliTool === 'mf-chart-data') {
+      return (
+        <ChartResult
+          result={result.result}
+          isExpanded={isExpanded}
+        />
+      )
+    }
+    
     switch (cliTool) {
       case 'mf-market-get':
         return (
@@ -134,6 +167,11 @@ export function ResultCard({
         />
       </div>
         
+      {/* Result body */}
+      <div className="px-2.5 pb-2">
+        {renderToolResult()}
+      </div>
+      
       {/* Output files - compact badges */}
       {fileCount > 0 && (
         <div className="px-2.5 pb-1.5 flex flex-wrap items-center gap-1">

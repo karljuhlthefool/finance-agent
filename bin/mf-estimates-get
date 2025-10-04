@@ -44,7 +44,7 @@ def main():
             currency=currency
         )
         
-        out_dir = WORKSPACE / "data" / "market" / ticker
+        out_dir = WORKSPACE / "raw" / "market" / ticker
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / f"estimates_{metric}.json"
         out_path.write_text(est.model_dump_json(indent=2))

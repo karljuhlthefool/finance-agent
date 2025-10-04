@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""
+CLI tool to render an InsightCard visual component in the UI.
+Displays structured findings, recommendations, or key takeaways.
+"""
+import json
+import sys
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+def read_stdin():
+    return sys.stdin.read()
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        title = args.get('title', '')
+        insight_type = args.get('type', 'analysis')  # analysis, recommendation, warning, opportunity
+        summary = args.get('summary', '')
+        points: List[Dict[str, Any]] = args.get('points', [])
+        conclusion = args.get('conclusion', '')
+        data_sources: List[str] = args.get('data_sources', [])
+        format_type = args.get('format', 'ui_component')
+        
+        # Validation
+        if not title:
+            raise ValueError("title is required")
+        if not summary and not points:
+            raise ValueError("Either 'summary' or 'points' must be provided")
+        
+        # Validate type
+        valid_types = ['analysis', 'recommendation', 'warning', 'opportunity', 'finding']
+        if insight_type not in valid_types:
+            raise ValueError(f"type must be one of: {', '.join(valid_types)}")
+        
+        # Validate points structure
+        for point in points:
+            if not isinstance(point, dict) or 'text' not in point:
+                raise ValueError("Each point must have a 'text' field")
+        
+        render_data = {
+            'title': title,
+            'type': insight_type,
+            'summary': summary,
+            'points': points,
+            'conclusion': conclusion,
+            'data_sources': data_sources
+        }
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': {
+                'component': 'insight_card',
+                'ui_id': f"insight_card_{datetime.now().strftime('%H%M%S%f')}",
+                'render_data': render_data
+            },
+            'format': format_type,
+            'metrics': {
+                't_ms': int(elapsed),
+                'point_count': len(points)
+            }
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Provide 'title', 'summary' or 'points' with 'text', and optional 'type' (analysis/recommendation/warning/opportunity)"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

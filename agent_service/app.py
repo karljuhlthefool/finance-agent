@@ -249,6 +249,8 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                         "mf-filing-extract", "mf-qa", "mf-calc-simple",
                         "mf-valuation-basic-dcf", "mf-report-save",
                         "mf-extract-json", "mf-json-inspect", "mf-doc-diff",
+                        "mf-render-metrics", "mf-render-comparison",
+                        "mf-render-insight", "mf-render-timeline",
                     ]
                     
                     # Check for tool names (with or without dashes/underscores)
@@ -352,6 +354,14 @@ def _scan_workspace_tree(root: Path, relative_to: Path, max_depth: int = 10, cur
             # Prevent nested workspace duplication: skip 'runtime' directory at root level
             # This prevents runtime/workspace/runtime/workspace nesting
             if relative_path == 'runtime' and current_depth == 0:
+                continue
+            
+            # Hide internal cache directory (SDK internals, binary files)
+            if relative_path.startswith('.cache') or item.name == '.cache':
+                continue
+            
+            # Hide old directory structure during transition
+            if current_depth == 0 and item.name in ['data', 'analysis', 'outputs', 'reports', 'logs', 'charts']:
                 continue
             
             # Filter out unnecessary files from workspace viewer

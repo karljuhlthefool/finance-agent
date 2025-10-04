@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""
+CLI tool to render a TimelineChart visual component in the UI.
+Displays time-series data with optional trend lines and annotations.
+"""
+import json
+import sys
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+def read_stdin():
+    return sys.stdin.read()
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        title = args.get('title', '')
+        subtitle = args.get('subtitle', '')
+        series: List[Dict[str, Any]] = args.get('series', [])
+        annotations: List[Dict[str, Any]] = args.get('annotations', [])
+        y_label = args.get('y_label', '')
+        data_sources: List[str] = args.get('data_sources', [])
+        format_type = args.get('format', 'ui_component')
+        
+        # Validation
+        if not title:
+            raise ValueError("title is required")
+        if not series:
+            raise ValueError("series array is required (at least 1 data series)")
+        
+        # Validate series structure
+        for s in series:
+            if not isinstance(s, dict) or 'name' not in s or 'data' not in s:
+                raise ValueError("Each series must have 'name' and 'data' fields")
+            if not isinstance(s['data'], list) or len(s['data']) == 0:
+                raise ValueError(f"Series '{s['name']}' must have non-empty 'data' array")
+            # Validate data points
+            for point in s['data']:
+                if not isinstance(point, dict) or 'date' not in point or 'value' not in point:
+                    raise ValueError(f"Each data point must have 'date' and 'value' fields")
+        
+        render_data = {
+            'title': title,
+            'subtitle': subtitle,
+            'series': series,
+            'annotations': annotations,
+            'y_label': y_label,
+            'data_sources': data_sources
+        }
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        total_points = sum(len(s['data']) for s in series)
+        
+        output = {
+            'ok': True,
+            'result': {
+                'component': 'timeline_chart',
+                'ui_id': f"timeline_chart_{datetime.now().strftime('%H%M%S%f')}",
+                'render_data': render_data
+            },
+            'format': format_type,
+            'metrics': {
+                't_ms': int(elapsed),
+                'series_count': len(series),
+                'data_points': total_points
+            }
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Provide 'title', 'series' array with 'name' and 'data' (array of {date, value} points)"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

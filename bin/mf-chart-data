@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""
+Chart data preparation tool: validates and structures data for beautiful interactive charts.
+Supports line, bar, area, pie, and combo charts for financial data visualization.
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+from typing import List, Dict, Optional, Literal
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+ChartType = Literal['line', 'bar', 'area', 'pie', 'combo']
+
+def read_stdin():
+    return sys.stdin.read()
+
+def validate_series_data(series: List[Dict], chart_type: str) -> bool:
+    """Validate that series data has required fields for chart type."""
+    if not series:
+        raise ValueError("series array cannot be empty")
+    
+    # Check required fields based on chart type
+    if chart_type == 'pie':
+        required_fields = {'name', 'value'}
+    else:
+        required_fields = {'x', 'y'}
+    
+    for i, point in enumerate(series):
+        missing = required_fields - set(point.keys())
+        if missing:
+            raise ValueError(f"Data point {i} missing required fields: {missing}")
+    
+    return True
+
+def prepare_chart_data(
+    chart_type: ChartType,
+    series: List[Dict],
+    title: Optional[str] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    series_name: Optional[str] = None,
+    colors: Optional[List[str]] = None,
+    format_y: Optional[str] = None,
+    secondary_series: Optional[List[Dict]] = None
+) -> Dict:
+    """
+    Prepare and validate chart data structure.
+    
+    Args:
+        chart_type: Type of chart (line, bar, area, pie, combo)
+        series: Primary data series
+        title: Chart title
+        x_label: X-axis label
+        y_label: Y-axis label (or primary Y-axis for combo)
+        series_name: Name of the primary series
+        colors: Custom color palette
+        format_y: Y-axis format hint (currency, percent, number)
+        secondary_series: Secondary data series (for combo charts)
+    
+    Returns:
+        Validated chart configuration
+    """
+    validate_series_data(series, chart_type)
+    
+    # Default colors - professional financial palette
+    default_colors = [
+        '#3b82f6',  # blue
+        '#10b981',  # green
+        '#f59e0b',  # amber
+        '#ef4444',  # red
+        '#8b5cf6',  # purple
+        '#06b6d4',  # cyan
+    ]
+    
+    chart_config = {
+        'type': chart_type,
+        'data': series,
+        'title': title,
+        'xLabel': x_label,
+        'yLabel': y_label,
+        'seriesName': series_name or 'Series 1',
+        'colors': colors or default_colors,
+        'formatY': format_y or 'number',
+    }
+    
+    # Add secondary series for combo charts
+    if chart_type == 'combo' and secondary_series:
+        validate_series_data(secondary_series, chart_type)
+        chart_config['secondarySeries'] = secondary_series
+        chart_config['secondarySeriesName'] = 'Series 2'
+    
+    return chart_config
+
+def save_chart_config(config: Dict, ticker: Optional[str] = None) -> str:
+    """Save chart configuration to workspace."""
+    output_dir = WORKSPACE / "artifacts" / "charts"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    timestamp = datetime.now().isoformat().replace(':', '-').split('.')[0]
+    ticker_part = f"{ticker}_" if ticker else ""
+    filename = f"chart_{ticker_part}{config['type']}_{timestamp}.json"
+    
+    output_path = output_dir / filename
+    output_path.write_text(json.dumps(config, indent=2))
+    
+    return str(output_path)
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        # Required args
+        chart_type = args.get('type') or args.get('chart_type')
+        series = args.get('series') or args.get('data')
+        
+        if not chart_type:
+            raise ValueError("chart_type required: line | bar | area | pie | combo")
+        
+        if not series:
+            raise ValueError("series array required with data points")
+        
+        if chart_type not in ['line', 'bar', 'area', 'pie', 'combo']:
+            raise ValueError(f"Invalid chart type: {chart_type}")
+        
+        # Optional args
+        title = args.get('title')
+        x_label = args.get('x_label') or args.get('xLabel')
+        y_label = args.get('y_label') or args.get('yLabel')
+        series_name = args.get('series_name') or args.get('seriesName')
+        colors = args.get('colors')
+        format_y = args.get('format_y') or args.get('formatY')
+        secondary_series = args.get('secondary_series') or args.get('secondarySeries')
+        ticker = args.get('ticker')
+        save_config = args.get('save', True)
+        
+        # Prepare chart configuration
+        chart_config = prepare_chart_data(
+            chart_type=chart_type,
+            series=series,
+            title=title,
+            x_label=x_label,
+            y_label=y_label,
+            series_name=series_name,
+            colors=colors,
+            format_y=format_y,
+            secondary_series=secondary_series
+        )
+        
+        # Save to file if requested
+        paths = []
+        if save_config:
+            config_path = save_chart_config(chart_config, ticker)
+            paths.append(config_path)
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': {
+                'chart': chart_config,
+                'data_points': len(series),
+                'saved': save_config,
+            },
+            'paths': paths,
+            'provenance': [{
+                'source': 'chart-data-preparation',
+                'meta': {
+                    'type': chart_type,
+                    'points': len(series),
+                }
+            }],
+            'metrics': {'t_ms': int(elapsed)},
+            'format': 'chart'
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Provide chart_type and series array. For pie charts use {name, value}, for others use {x, y}"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

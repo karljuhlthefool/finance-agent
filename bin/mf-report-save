@@ -33,12 +33,12 @@ def main():
         
         # Determine output directory based on type
         type_dirs = {
-            'analysis': 'reports/analysis',
-            'summary': 'reports/summaries',
-            'recommendation': 'reports/recommendations',
-            'comparison': 'reports/comparisons',
-            'valuation': 'reports/valuations',
-            'custom': 'reports/custom'
+            'analysis': 'artifacts/reports/analysis',
+            'summary': 'artifacts/reports/summaries',
+            'recommendation': 'artifacts/reports/recommendations',
+            'comparison': 'artifacts/reports/comparisons',
+            'valuation': 'artifacts/reports/valuations',
+            'custom': 'artifacts/reports/custom'
         }
         
         output_dir = WORKSPACE / type_dirs.get(report_type, 'reports/custom')

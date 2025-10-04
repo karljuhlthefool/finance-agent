@@ -1,0 +1,34 @@
+{
+  "type": "line",
+  "data": [
+    {
+      "x": "Q3 2024",
+      "y": 94036000000
+    },
+    {
+      "x": "Q2 2024",
+      "y": 85777000000
+    },
+    {
+      "x": "Q1 2024",
+      "y": 81797000000
+    },
+    {
+      "x": "Q4 2023",
+      "y": 124630000000
+    }
+  ],
+  "title": "AAPL Quarterly Revenue",
+  "xLabel": "Quarter",
+  "yLabel": "Revenue",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

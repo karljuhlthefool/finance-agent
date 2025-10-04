@@ -3,13 +3,19 @@ from pathlib import Path
 
 
 def ensure_workspace(root: Path) -> None:
-    """Create workspace directory structure."""
+    """Create workspace directory structure.
+    
+    Structure:
+      workspace/
+        ├── raw/          # Automatic data fetches (market, filings)
+        ├── artifacts/    # Intentional user outputs (reports, charts, Q&A)
+        └── .cache/       # Hidden SDK internals
+    """
     dirs = [
         root,
-        root / "data",
-        root / "analysis",
-        root / "outputs",
-        root / "logs",
+        root / "raw",
+        root / "artifacts",
+        root / ".cache",
     ]
     
     for d in dirs:

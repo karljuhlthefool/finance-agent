@@ -1,0 +1,92 @@
+[
+  {
+    "title": "Senior Vice President of Worldwide Marketing",
+    "name": "Mr. Greg  Joswiak",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": null,
+    "titleSince": null
+  },
+  {
+    "title": "Chief People Officer & Senior Vice President of Retail",
+    "name": "Ms. Deirdre  O'Brien",
+    "pay": 4613369,
+    "currencyPay": "USD",
+    "gender": "female",
+    "yearBorn": 1967,
+    "titleSince": null
+  },
+  {
+    "title": "Senior Vice President & Chief Financial Officer",
+    "name": "Mr. Kevan  Parekh",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": 1972,
+    "titleSince": null
+  },
+  {
+    "title": "Senior Director of Corporate Accounting",
+    "name": "Mr. Chris  Kondo",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": null,
+    "titleSince": null
+  },
+  {
+    "title": "Vice President of Corporate Development",
+    "name": "Mr. Adrian  Perica",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": 1974,
+    "titleSince": null
+  },
+  {
+    "title": "Director of Investor Relations",
+    "name": "Suhasini  Chandramouli",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "",
+    "yearBorn": null,
+    "titleSince": null
+  },
+  {
+    "title": "Vice President of Worldwide Communications",
+    "name": "Ms. Kristin Huguet Quayle",
+    "pay": null,
+    "currencyPay": "USD",
+    "gender": "female",
+    "yearBorn": null,
+    "titleSince": null
+  },
+  {
+    "title": "Chief Operating Officer",
+    "name": "Mr. Jeffrey E. Williams",
+    "pay": 4637585,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": 1964,
+    "titleSince": null
+  },
+  {
+    "title": "Senior Vice President, General Counsel & Secretary",
+    "name": "Ms. Katherine L. Adams",
+    "pay": 4618064,
+    "currencyPay": "USD",
+    "gender": "female",
+    "yearBorn": 1964,
+    "titleSince": null
+  },
+  {
+    "title": "Chief Executive Officer & Director",
+    "name": "Mr. Timothy D. Cook",
+    "pay": 16239562,
+    "currencyPay": "USD",
+    "gender": "male",
+    "yearBorn": 1961,
+    "titleSince": null
+  }
+]

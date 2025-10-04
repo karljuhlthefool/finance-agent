@@ -29,6 +29,12 @@ fi
 echo ""
 echo "🚀 Starting Backend (Port 5052)..."
 source venv/bin/activate
+
+# Set workspace path as absolute path
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export WORKSPACE_ABS_PATH="${PROJECT_ROOT}/runtime/workspace"
+echo "   Workspace: $WORKSPACE_ABS_PATH"
+
 nohup uvicorn agent_service.app:app --reload --host 0.0.0.0 --port 5052 > /tmp/backend_output.log 2>&1 &
 BACKEND_PID=$!
 echo "   Backend PID: $BACKEND_PID"

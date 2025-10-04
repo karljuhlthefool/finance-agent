@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""
+Render a MetricsGrid visual component.
+Displays 4-12 key metrics in a scannable grid format.
+
+USAGE:
+  echo '{"title":"AAPL Snapshot","metrics":[...]}' | ./mf-render-metrics
+
+ARGUMENTS (JSON via stdin):
+  title (required): Title for the metrics grid
+  subtitle (optional): Subtitle/context (e.g., "Q4 2024", "As of Dec 28")
+  metrics (required): Array of metric objects (4-12 items recommended)
+  
+  Each metric object:
+    label (required): Metric name (e.g., "Revenue", "P/E Ratio")
+    value (required): Primary value to display (e.g., "$394B", "28.5x")
+    change (optional): Change indicator (e.g., "+15.2% YoY", "↑110bps")
+    trend (optional): Trend direction: "up" | "down" | "neutral"
+    context (optional): Additional context (e.g., "Premium", "Excellent")
+    benchmark (optional): Comparison point (e.g., "vs industry avg 22x")
+
+  data_sources (optional): Array of file paths that sourced this data
+
+EXAMPLES:
+  # Simple metrics grid
+  echo '{
+    "title": "AAPL Financial Snapshot",
+    "subtitle": "Q4 2024",
+    "metrics": [
+      {
+        "label": "Revenue",
+        "value": "$394.3B",
+        "change": "+15.2% YoY",
+        "trend": "up"
+      },
+      {
+        "label": "P/E Ratio",
+        "value": "28.5x",
+        "context": "Premium",
+        "benchmark": "vs industry 22x"
+      }
+    ]
+  }' | ./mf-render-metrics
+
+  # With data sources
+  echo '{
+    "title": "MSFT Valuation Metrics",
+    "metrics": [
+      {"label": "Fair Value", "value": "$425", "context": "DCF Base Case"},
+      {"label": "Current Price", "value": "$374", "trend": "neutral"},
+      {"label": "Upside", "value": "+13.6%", "trend": "up"}
+    ],
+    "data_sources": [
+      "data/market/MSFT/fundamentals_quarterly.json",
+      "analysis/tables/dcf_MSFT.json"
+    ]
+  }' | ./mf-render-metrics
+
+OUTPUT:
+  JSON with structure:
+  {
+    "ok": true,
+    "result": {
+      "component": "metrics_grid",
+      "ui_id": "<unique_id>",
+      "render_data": {<validated_input>}
+    },
+    "format": "ui_component",
+    "metrics": {"t_ms": <elapsed_ms>}
+  }
+"""
+import json
+import sys
+import os
+from pathlib import Path
+from datetime import datetime
+import uuid
+
+WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
+assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
+
+def read_stdin():
+    return sys.stdin.read()
+
+def validate_metric(metric: dict, index: int) -> dict:
+    """Validate a single metric object."""
+    errors = []
+    
+    if 'label' not in metric:
+        errors.append(f"Metric {index}: 'label' is required")
+    if 'value' not in metric:
+        errors.append(f"Metric {index}: 'value' is required")
+    
+    # Validate trend if provided
+    if 'trend' in metric and metric['trend'] not in ['up', 'down', 'neutral']:
+        errors.append(f"Metric {index}: 'trend' must be 'up', 'down', or 'neutral'")
+    
+    if errors:
+        raise ValueError("; ".join(errors))
+    
+    # Return cleaned metric with all fields
+    return {
+        'label': str(metric['label']),
+        'value': str(metric['value']),
+        'change': str(metric.get('change', '')),
+        'trend': metric.get('trend', 'neutral'),
+        'context': str(metric.get('context', '')),
+        'benchmark': str(metric.get('benchmark', ''))
+    }
+
+def validate_input(args: dict) -> dict:
+    """Validate all input arguments."""
+    errors = []
+    
+    # Required fields
+    if 'title' not in args:
+        errors.append("'title' is required")
+    if 'metrics' not in args:
+        errors.append("'metrics' is required")
+    elif not isinstance(args['metrics'], list):
+        errors.append("'metrics' must be an array")
+    elif len(args['metrics']) == 0:
+        errors.append("'metrics' cannot be empty (provide at least 1 metric)")
+    elif len(args['metrics']) > 16:
+        errors.append("'metrics' should contain at most 16 items for readability")
+    
+    if errors:
+        raise ValueError("; ".join(errors))
+    
+    # Validate each metric
+    validated_metrics = []
+    for idx, metric in enumerate(args['metrics']):
+        validated_metrics.append(validate_metric(metric, idx + 1))
+    
+    # Build validated output
+    validated = {
+        'title': str(args['title']),
+        'subtitle': str(args.get('subtitle', '')),
+        'metrics': validated_metrics,
+        'data_sources': args.get('data_sources', [])
+    }
+    
+    return validated
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        # Validate input
+        validated_data = validate_input(args)
+        
+        # Generate unique ID for this component
+        ui_id = f"metrics_grid_{uuid.uuid4().hex[:8]}"
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': {
+                'component': 'metrics_grid',
+                'ui_id': ui_id,
+                'render_data': validated_data
+            },
+            'format': 'ui_component',
+            'metrics': {
+                't_ms': int(elapsed),
+                'metric_count': len(validated_data['metrics'])
+            }
+        }
+        
+        print(json.dumps(output))
+        
+    except json.JSONDecodeError as e:
+        output = {
+            'ok': False,
+            'error': f"Invalid JSON input: {str(e)}",
+            'hint': "Ensure input is valid JSON with 'title' and 'metrics' fields"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+        
+    except ValueError as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Check that all required fields are provided and metrics array is valid"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Unexpected error during validation"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

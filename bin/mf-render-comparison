@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""
+CLI tool to render a ComparisonTable visual component in the UI.
+Compares 2-5 entities (companies, scenarios, options) side-by-side.
+"""
+import json
+import sys
+from datetime import datetime
+from typing import List, Dict, Any
+
+def read_stdin():
+    return sys.stdin.read()
+
+def main():
+    start_time = datetime.now()
+    
+    try:
+        raw = read_stdin()
+        args = json.loads(raw.strip()) if raw.strip() else {}
+        
+        title = args.get('title', '')
+        subtitle = args.get('subtitle', '')
+        entities: List[Dict[str, Any]] = args.get('entities', [])
+        rows: List[Dict[str, Any]] = args.get('rows', [])
+        data_sources: List[str] = args.get('data_sources', [])
+        format_type = args.get('format', 'ui_component')
+        
+        # Validation
+        if not entities:
+            raise ValueError("entities array is required (2-5 entities to compare)")
+        if not rows:
+            raise ValueError("rows array is required (metrics to compare)")
+        if not title:
+            raise ValueError("title is required")
+        if len(entities) < 2 or len(entities) > 5:
+            raise ValueError("Must compare 2-5 entities")
+        
+        # Validate entity structure
+        for entity in entities:
+            if not isinstance(entity, dict) or 'name' not in entity:
+                raise ValueError("Each entity must have a 'name' field")
+        
+        # Validate row structure
+        for row in rows:
+            if not isinstance(row, dict) or 'label' not in row or 'values' not in row:
+                raise ValueError("Each row must have 'label' and 'values' fields")
+            if len(row['values']) != len(entities):
+                raise ValueError(f"Row '{row['label']}' must have {len(entities)} values to match entities")
+        
+        render_data = {
+            'title': title,
+            'subtitle': subtitle,
+            'entities': entities,
+            'rows': rows,
+            'data_sources': data_sources
+        }
+        
+        elapsed = (datetime.now() - start_time).total_seconds() * 1000
+        
+        output = {
+            'ok': True,
+            'result': {
+                'component': 'comparison_table',
+                'ui_id': f"comparison_table_{datetime.now().strftime('%H%M%S%f')}",
+                'render_data': render_data
+            },
+            'format': format_type,
+            'metrics': {
+                't_ms': int(elapsed),
+                'entity_count': len(entities),
+                'row_count': len(rows)
+            }
+        }
+        
+        print(json.dumps(output))
+        
+    except Exception as e:
+        output = {
+            'ok': False,
+            'error': str(e),
+            'hint': "Provide 'title', 'entities' (2-5 items with 'name'), and 'rows' (with 'label' and 'values')"
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+

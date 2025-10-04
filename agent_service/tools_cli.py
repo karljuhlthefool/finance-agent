@@ -153,10 +153,81 @@ async def mf_report_save_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+@tool(
+    "mf_chart_data",
+    "Create interactive financial charts (line, bar, area, pie, combo) for data visualization",
+    {
+        "chart_type": str,
+        "series": list,
+        "title": str,
+        "x_label": str,
+        "y_label": str,
+        "series_name": str,
+        "format_y": str,
+        "ticker": str,
+    },
+)
+async def mf_chart_data_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+    # Parse series if it's a string
+    series = args.get("series", [])
+    if isinstance(series, str):
+        try:
+            series = json.loads(series)
+        except json.JSONDecodeError:
+            series = []
+    
+    # Parse secondary_series if it's a string
+    secondary_series = args.get("secondary_series")
+    if isinstance(secondary_series, str):
+        try:
+            secondary_series = json.loads(secondary_series)
+        except json.JSONDecodeError:
+            secondary_series = None
+    
+    payload = {
+        "type": args.get("chart_type", "line"),
+        "series": series,
+        "title": args.get("title"),
+        "x_label": args.get("x_label"),
+        "y_label": args.get("y_label"),
+        "series_name": args.get("series_name"),
+        "format_y": args.get("format_y", "number"),
+        "colors": args.get("colors"),
+        "secondary_series": secondary_series,
+        "ticker": args.get("ticker"),
+        "save": args.get("save", True),
+    }
+    cli_result = await run_cli("mf-chart-data", payload)
+    
+    # run_cli returns {"ok": True, "data": {...}} or {"ok": False, "error": "..."}
+    if not cli_result.get("ok"):
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"Chart generation failed: {cli_result.get('error', 'Unknown error')}",
+                }
+            ]
+        }
+    
+    # Extract the actual chart data from the "data" field
+    chart_data = cli_result.get("data", {})
+    
+    return {
+        "content": [
+            {
+                "type": "json",
+                "name": "mf_chart_data.result",
+                "json": chart_data,
+            }
+        ]
+    }
+
+
 def build_sdk_server():
     """Create the in-process MCP server that exposes CLI tools to the agent."""
     return create_sdk_mcp_server(
         name="finance-cli-tools",
         version="1.0.0",
-        tools=[mf_calc_simple_tool, mf_market_get_tool, mf_report_save_tool],
+        tools=[mf_calc_simple_tool, mf_market_get_tool, mf_report_save_tool, mf_chart_data_tool],
     )
