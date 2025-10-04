@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useWorkspace, type FileNode } from '@/lib/workspace-context'
+import { isChartFilePath } from '@/lib/chart-detector'
 
 function formatSize(bytes?: number): string {
   if (!bytes) return ''
@@ -13,8 +14,13 @@ function formatSize(bytes?: number): string {
 function getFileIcon(node: FileNode): string {
   if (node.type === 'directory') return '📁'
   
+  // Special handling for chart files - show chart icon
+  if (node.extension === '.json' && isChartFilePath(node.path)) {
+    return '📊'
+  }
+  
   switch (node.extension) {
-    case '.json': return '📊'
+    case '.json': return '📋' // Regular JSON gets different icon
     case '.md': return '📝'
     case '.txt': return '📄'
     case '.log': return '📋'

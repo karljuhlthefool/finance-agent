@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { useWorkspace } from '@/lib/workspace-context'
+import { ChartResult } from '@/components/tool-cards/tool-specific/ChartResult'
+import { isChartData, isChartFilePath, transformToChartResult } from '@/lib/chart-detector'
 
 type FileContent = {
   ok: boolean
@@ -75,6 +77,60 @@ function TextViewer({ content }: { content: string }) {
       {content}
     </pre>
   )
+}
+
+function ChartViewer({ content, fileName }: { content: string; fileName: string }) {
+  const [showRawJson, setShowRawJson] = useState(false)
+  
+  try {
+    const parsed = JSON.parse(content)
+    
+    // Validate it's chart data
+    if (!isChartData(parsed)) {
+      // Fall back to JSON viewer if not valid chart data
+      return <JsonViewer content={content} />
+    }
+    
+    // Transform to ChartResult format
+    const chartResult = transformToChartResult(parsed)
+    
+    return (
+      <div className="p-4 h-full overflow-auto">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700">Interactive Chart View</span>
+          <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded font-medium">
+            📊 {parsed.type.toUpperCase()}
+          </span>
+          <span className="text-xs text-slate-500">({fileName})</span>
+        </div>
+        
+        <ChartResult 
+          result={chartResult} 
+          isExpanded={true}
+        />
+        
+        {/* Option to view raw JSON */}
+        <div className="mt-4">
+          <button
+            onClick={() => setShowRawJson(!showRawJson)}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+          >
+            {showRawJson ? '▼ Hide' : '▶ Show'} Raw JSON Data
+          </button>
+          
+          {showRawJson && (
+            <div className="mt-2">
+              <JsonViewer content={content} />
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  } catch (err) {
+    // Parse error - fall back to JSON viewer
+    console.warn('Failed to parse chart data:', err)
+    return <JsonViewer content={content} />
+  }
 }
 
 export default function FileViewer() {
@@ -208,8 +264,20 @@ export default function FileViewer() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-white">
-        {fileData.extension === '.json' && <JsonViewer content={fileData.content} />}
+        {/* Chart data detection - check FIRST before regular JSON */}
+        {fileData.extension === '.json' && 
+         isChartFilePath(fileData.path) && 
+         <ChartViewer content={fileData.content} fileName={fileData.name} />}
+        
+        {/* Regular JSON files (non-chart) */}
+        {fileData.extension === '.json' && 
+         !isChartFilePath(fileData.path) && 
+         <JsonViewer content={fileData.content} />}
+        
+        {/* Markdown files */}
         {fileData.extension === '.md' && <MarkdownViewer content={fileData.content} />}
+        
+        {/* Plain text files */}
         {!['.json', '.md'].includes(fileData.extension) && (
           <TextViewer content={fileData.content} />
         )}
