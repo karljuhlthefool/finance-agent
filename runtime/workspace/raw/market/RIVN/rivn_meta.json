@@ -1,0 +1,20 @@
+{
+  "ticker": "RIVN",
+  "fields": [
+    "fundamentals"
+  ],
+  "range": "1y",
+  "period": "quarterly",
+  "limit": 8,
+  "fetched_at": "2025-10-05T09:08:58.272031",
+  "provenance": [
+    {
+      "source": "FMP",
+      "fetched_at": "2025-10-05T07:08:58.271155",
+      "meta": {
+        "endpoint": "financial-statements",
+        "period": "quarterly"
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "NVIDIA",
+      "y": 15.8
+    },
+    {
+      "x": "AMD",
+      "y": 6.8
+    },
+    {
+      "x": "Intel",
+      "y": 14.4
+    }
+  ],
+  "title": "Absolute R&D Spending - Last 4 Quarters (TTM)",
+  "xLabel": "Company",
+  "yLabel": "R&D Spending (Billions)",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

@@ -115,6 +115,7 @@ def main():
         
         # Extraction method
         path = args.get('path')  # Simple path like "income_statement[0].revenue"
+        paths = args.get('paths')  # Batch extraction: [{"key": "revenue", "path": "..."}, ...]
         instruction = args.get('instruction')  # Natural language for GPT
         
         # Load JSON data
@@ -131,6 +132,22 @@ def main():
             result = extract_with_jq_style(data, path)
             method = "path-based"
             cost_estimate = 0
+        elif paths:
+            # Batch extraction: extract multiple paths in one call
+            if not isinstance(paths, list):
+                raise ValueError("'paths' must be an array of {key, path} objects")
+            
+            result = {}
+            for item in paths:
+                if not isinstance(item, dict) or 'key' not in item or 'path' not in item:
+                    raise ValueError("Each item in 'paths' must have 'key' and 'path' fields")
+                
+                key = item['key']
+                item_path = item['path']
+                result[key] = extract_with_jq_style(data, item_path)
+            
+            method = "path-based-batch"
+            cost_estimate = 0
         elif instruction:
             # Complex extraction: use Claude Haiku
             result = extract_with_haiku(data, instruction)
@@ -140,7 +157,7 @@ def main():
             data_tokens = len(json.dumps(data)) / 4  # Rough estimate
             cost_estimate = (data_tokens / 1000) * 0.001 + 0.001  # Input + typical output
         else:
-            raise ValueError("Either 'path' or 'instruction' required")
+            raise ValueError("Either 'path', 'paths', or 'instruction' required")
         
         elapsed = (datetime.now() - start_time).total_seconds() * 1000
         

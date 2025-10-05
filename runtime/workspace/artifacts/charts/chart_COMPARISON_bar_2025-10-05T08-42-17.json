@@ -1,0 +1,30 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "Apple",
+      "y": 24.405
+    },
+    {
+      "x": "Microsoft",
+      "y": 25.568
+    },
+    {
+      "x": "Google",
+      "y": 5.301
+    }
+  ],
+  "title": "Free Cash Flow Comparison - Q2 2025",
+  "xLabel": null,
+  "yLabel": "Free Cash Flow (Billions USD)",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

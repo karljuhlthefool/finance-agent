@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Deterministic calculations: deltas, growth, sums, averages.
+Deterministic calculations: deltas, growth, sums, averages, ratios, statistics.
 """
 import json
 import sys
@@ -8,6 +8,13 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.util.error_handling import (
+    error_response, success_response, missing_field_error, 
+    division_by_zero_error, empty_data_error
+)
 
 WORKSPACE = Path(os.getenv("WORKSPACE_ABS_PATH", "./runtime/workspace")).resolve()
 assert WORKSPACE.is_absolute(), "WORKSPACE_ABS_PATH must be an absolute path"
@@ -88,6 +95,79 @@ def calc_average(values: List[float], avg_type: str = 'mean') -> Optional[float]
     
     return None
 
+def calc_ratio(numerator: float, denominator: float, mode: str = 'decimal', precision: int = 2) -> Dict:
+    """Calculate ratio between two values."""
+    # Division by zero is checked before calling this function
+    ratio = numerator / denominator
+    
+    if mode == 'percent':
+        ratio_value = ratio * 100
+        formatted = f"{ratio_value:.{precision}f}%"
+    else:  # decimal
+        ratio_value = ratio
+        formatted = f"{ratio_value:.{precision}f}x"
+    
+    return {
+        'numerator': numerator,
+        'denominator': denominator,
+        'ratio': ratio_value,
+        'mode': mode,
+        'formatted': formatted
+    }
+
+def calc_statistics(values: List[float], metrics: List[str]) -> Dict:
+    """Calculate statistical metrics for a list of values."""
+    import statistics as stats
+    
+    if not values:
+        raise ValueError("Values array cannot be empty")
+    
+    results = {}
+    
+    if 'mean' in metrics:
+        results['mean'] = stats.mean(values)
+    
+    if 'median' in metrics:
+        results['median'] = stats.median(values)
+    
+    if 'std_dev' in metrics:
+        if len(values) < 2:
+            results['std_dev'] = 0
+        else:
+            results['std_dev'] = stats.stdev(values)
+    
+    if 'variance' in metrics:
+        if len(values) < 2:
+            results['variance'] = 0
+        else:
+            results['variance'] = stats.variance(values)
+    
+    if 'min' in metrics:
+        results['min'] = min(values)
+    
+    if 'max' in metrics:
+        results['max'] = max(values)
+    
+    if 'range' in metrics:
+        results['range'] = max(values) - min(values)
+    
+    if 'count' in metrics:
+        results['count'] = len(values)
+    
+    if 'sum' in metrics:
+        results['sum'] = sum(values)
+    
+    # Coefficient of variation (std_dev / mean)
+    if 'cv' in metrics:
+        mean_val = results.get('mean', stats.mean(values))
+        std_val = results.get('std_dev', stats.stdev(values) if len(values) >= 2 else 0)
+        if mean_val != 0:
+            results['cv'] = std_val / mean_val
+        else:
+            results['cv'] = 0
+    
+    return results
+
 def main():
     start_time = datetime.now()
     
@@ -165,8 +245,125 @@ def main():
                 'count': len(values)
             }
         
+        elif operation == 'ratio':
+            numerator = args.get('numerator')
+            denominator = args.get('denominator')
+            mode = args.get('mode', 'decimal')
+            precision = args.get('precision', 2)
+            
+            if numerator is None:
+                print(json.dumps(missing_field_error('numerator', ['numerator', 'denominator'])))
+                sys.exit(1)
+            if denominator is None:
+                print(json.dumps(missing_field_error('denominator', ['numerator', 'denominator'])))
+                sys.exit(1)
+            if denominator == 0:
+                print(json.dumps(division_by_zero_error("denominator cannot be zero")))
+                sys.exit(1)
+            
+            result = calc_ratio(numerator, denominator, mode, precision)
+        
+        elif operation == 'statistics' or operation == 'stats':
+            values = args.get('values', [])
+            metrics = args.get('metrics', ['mean', 'std_dev', 'min', 'max'])
+            
+            if not values:
+                raise ValueError("values array required")
+            
+            result = calc_statistics(values, metrics)
+            result['values_count'] = len(values)
+        
+        elif operation == 'batch':
+            operations = args.get('operations', [])
+            
+            if not operations:
+                raise ValueError("operations array required")
+            
+            if not isinstance(operations, list):
+                raise ValueError("operations must be an array")
+            
+            result = {}
+            for op_item in operations:
+                if not isinstance(op_item, dict):
+                    raise ValueError("Each operation must be an object with 'id' and 'op' fields")
+                
+                op_id = op_item.get('id')
+                op_type = op_item.get('op')
+                
+                if not op_id:
+                    raise ValueError("Each operation must have an 'id' field")
+                if not op_type:
+                    raise ValueError("Each operation must have an 'op' field")
+                
+                # Execute the operation based on type
+                if op_type == 'ratio':
+                    numerator = op_item.get('numerator')
+                    denominator = op_item.get('denominator')
+                    mode = op_item.get('mode', 'decimal')
+                    precision = op_item.get('precision', 2)
+                    
+                    if numerator is None or denominator is None:
+                        result[op_id] = {'error': 'numerator and denominator required'}
+                        continue
+                    if denominator == 0:
+                        result[op_id] = {'error': 'division by zero'}
+                        continue
+                    
+                    result[op_id] = calc_ratio(numerator, denominator, mode, precision)
+                
+                elif op_type == 'delta':
+                    current = op_item.get('current')
+                    previous = op_item.get('previous')
+                    mode = op_item.get('mode', 'percent')
+                    
+                    if current is None or previous is None:
+                        result[op_id] = {'error': 'current and previous required'}
+                        continue
+                    
+                    delta_result = {
+                        'current': current,
+                        'previous': previous,
+                        'delta_abs': calc_delta(current, previous, 'absolute'),
+                        'delta_pct': calc_delta(current, previous, 'percent'),
+                        'mode': mode
+                    }
+                    result[op_id] = delta_result
+                
+                elif op_type == 'sum':
+                    values = op_item.get('values', [])
+                    weights = op_item.get('weights')
+                    
+                    if not values:
+                        result[op_id] = {'error': 'values required'}
+                        continue
+                    
+                    result[op_id] = {
+                        'sum': calc_sum(values, weights),
+                        'count': len(values),
+                        'weighted': weights is not None
+                    }
+                
+                elif op_type == 'average':
+                    values = op_item.get('values', [])
+                    avg_type = op_item.get('type', 'mean')
+                    
+                    if not values:
+                        result[op_id] = {'error': 'values required'}
+                        continue
+                    
+                    result[op_id] = {
+                        'average': calc_average(values, avg_type),
+                        'type': avg_type,
+                        'count': len(values)
+                    }
+                
+                else:
+                    result[op_id] = {'error': f'Unknown operation type: {op_type}'}
+            
+            method = "batch"
+        
         else:
-            raise ValueError(f"Unknown operation: {operation}. Use delta, growth, sum, or average")
+            raise ValueError(f"Unknown operation: {operation}. Use delta, growth, sum, average, ratio, statistics, or batch")
         
         elapsed = (datetime.now() - start_time).total_seconds() * 1000
         

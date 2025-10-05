@@ -1,0 +1,22 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "AAPL",
+      "y": 24.16
+    },
+    {
+      "x": "MSFT",
+      "y": 0.8
+    }
+  ],
+  "title": "Quarterly Stock Performance Comparison",
+  "xLabel": "Company",
+  "yLabel": "Return (%)",
+  "seriesName": "Quarterly Return",
+  "colors": [
+    "#0066CC",
+    "#00A4EF"
+  ],
+  "formatY": "percent"
+}

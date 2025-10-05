@@ -1,0 +1,103 @@
+{
+  "ticker": "LCID",
+  "currency": "USD",
+  "pit": true,
+  "quarters": [
+    {
+      "period_end": "2023-09-30",
+      "revenue": "137814000.0",
+      "net_income": "-630894000.0",
+      "ocf": "-513582000.0",
+      "fcf": "-706099000.0",
+      "shares_diluted": "228444678.0",
+      "total_assets": "8941234000.0",
+      "total_debt": "2405925000.0",
+      "cash": "1164391000.0"
+    },
+    {
+      "period_end": "2023-12-31",
+      "revenue": "157151000.0",
+      "net_income": "-653766000.0",
+      "ocf": "-474549000.0",
+      "fcf": "-747191000.0",
+      "shares_diluted": "229203250.0",
+      "total_assets": "8512718000.0",
+      "total_debt": "2427901000.0",
+      "cash": "1371507000.0"
+    },
+    {
+      "period_end": "2024-03-31",
+      "revenue": "172740000.0",
+      "net_income": "-680859000.0",
+      "ocf": "-516745000.0",
+      "fcf": "-714942000.0",
+      "shares_diluted": "230187064.0",
+      "total_assets": "8897041000.0",
+      "total_debt": "2423469000.0",
+      "cash": "2119510000.0"
+    },
+    {
+      "period_end": "2024-06-30",
+      "revenue": "200581000.0",
+      "net_income": "-643390000.0",
+      "ocf": "-506987000.0",
+      "fcf": "-741302000.0",
+      "shares_diluted": "231036053.0",
+      "total_assets": "8223268000.0",
+      "total_debt": "2416003000.0",
+      "cash": "1353595000.0"
+    },
+    {
+      "period_end": "2024-09-30",
+      "revenue": "200038000.0",
+      "net_income": "-992475000.0",
+      "ocf": "-462795000.0",
+      "fcf": "-622489000.0",
+      "shares_diluted": "232397154.0",
+      "total_assets": "8489183000.0",
+      "total_debt": "2404253000.0",
+      "cash": "1893638000.0"
+    },
+    {
+      "period_end": "2024-12-31",
+      "revenue": "234473000.0",
+      "net_income": "-397218000.0",
+      "ocf": "-533147000.0",
+      "fcf": "-824782000.0",
+      "shares_diluted": "284083800.0",
+      "total_assets": "9647931000.0",
+      "total_debt": "2476883000.0",
+      "cash": "1606865000.0"
+    },
+    {
+      "period_end": "2025-03-31",
+      "revenue": "235048000.0",
+      "net_income": "-366171000.0",
+      "ocf": "-428613000.0",
+      "fcf": "-589854000.0",
+      "shares_diluted": "303631700.0",
+      "total_assets": "9217969000.0",
+      "total_debt": "2558172000.0",
+      "cash": "1854879000.0"
+    },
+    {
+      "period_end": "2025-06-30",
+      "revenue": "259432000.0",
+      "net_income": "-539432000.0",
+      "ocf": "-1254761000.0",
+      "fcf": "-1598665000.0",
+      "shares_diluted": "305788272.0",
+      "total_assets": "8869078000.0",
+      "total_debt": "2740927000.0",
+      "cash": "1795719000.0"
+    }
+  ],
+  "provenance": {
+    "source": "FMP",
+    "fetched_at": "2025-10-05T07:09:00.394169",
+    "meta": {
+      "endpoint": "financial-statements",
+      "period": "quarterly"
+    }
+  }
+}

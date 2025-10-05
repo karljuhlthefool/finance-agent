@@ -1,0 +1,30 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "AAPL",
+      "y": 27.75
+    },
+    {
+      "x": "MSFT",
+      "y": 27.04
+    },
+    {
+      "x": "GOOGL",
+      "y": 21.58
+    }
+  ],
+  "title": "EV/EBITDA Comparison",
+  "xLabel": "Company",
+  "yLabel": "EV/EBITDA",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

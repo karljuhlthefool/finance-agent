@@ -1,0 +1,52 @@
+{
+  "management_style": {
+    "tone": "Direct, risk-embracing, and mission-driven with strong technical focus",
+    "key_characteristics": [
+      "Emphasis on equity-based compensation over traditional benefits",
+      "High tolerance for personal financial risk",
+      "Multi-company leadership approach",
+      "Technical and operational expertise prioritization",
+      "Informal yet performance-driven culture"
+    ],
+    "distinctive_language": [
+      "Technoking of Tesla",
+      "entirely at risk",
+      "zero initial value",
+      "mission to accelerate the world's transition to sustainable energy",
+      "ownership culture",
+      "transformative growth"
+    ]
+  },
+  "top_3_priorities": [
+    {
+      "priority": "Market value and shareholder alignment",
+      "frequency_indicators": "Most frequently emphasized across compensation and strategy sections",
+      "evidence": [
+        "required to add approximately $600 billion to its market capitalization",
+        "emphasis on equity-based compensation over cash",
+        "value realizable only if Tesla's stock price appreciated",
+        "minimum five-year holding period generally applicable"
+      ]
+    },
+    {
+      "priority": "Technological innovation and leadership",
+      "frequency_indicators": "Consistently emphasized in leadership roles and strategic initiatives",
+      "evidence": [
+        "Further improvements and deployment of FSD capabilities",
+        "increased AI training compute by over 400%",
+        "introduction of purpose-built Robotaxi product",
+        "Engineering and technical backgrounds of key leaders emphasized"
+      ]
+    },
+    {
+      "priority": "Long-term mission achievement",
+      "frequency_indicators": "Repeatedly referenced in company mission and compensation structure",
+      "evidence": [
+        "Our mission is to accelerate the world's transition to sustainable energy. This is a long-term mission",
+        "promotion of long-termism and an ownership culture",
+        "aligns the interests of our employees with the long-term interests of our shareholders",
+        "focus on sustainable energy transition"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "Apple",
+      "y": 94036000000
+    },
+    {
+      "x": "Microsoft",
+      "y": 76441000000
+    }
+  ],
+  "title": "Quarterly Revenue Comparison",
+  "xLabel": "Company",
+  "yLabel": "Revenue",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

@@ -1,0 +1,34 @@
+{
+  "type": "line",
+  "data": [
+    {
+      "x": "Q4 2024",
+      "y": 94930000000
+    },
+    {
+      "x": "Q1 2025",
+      "y": 124300000000
+    },
+    {
+      "x": "Q2 2025",
+      "y": 95359000000
+    },
+    {
+      "x": "Q3 2025",
+      "y": 94036000000
+    }
+  ],
+  "title": "Apple Revenue Trend - Last 4 Quarters",
+  "xLabel": "Quarter",
+  "yLabel": "Revenue",
+  "seriesName": "Quarterly Revenue",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "currency"
+}

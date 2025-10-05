@@ -1,0 +1,30 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "NVIDIA",
+      "y": 15.8
+    },
+    {
+      "x": "AMD",
+      "y": 25.1
+    },
+    {
+      "x": "Intel",
+      "y": 29.7
+    }
+  ],
+  "title": "Average R&D Spending as % of Revenue (3-Year Average)",
+  "xLabel": "Company",
+  "yLabel": "R&D % of Revenue",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "percent"
+}

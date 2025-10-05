@@ -1,0 +1,26 @@
+{
+  "ticker": "MSFT",
+  "currency": "USD",
+  "pit": true,
+  "quarters": [
+    {
+      "period_end": "2025-06-30",
+      "revenue": "76441000000.0",
+      "net_income": "27233000000.0",
+      "ocf": "42647000000.0",
+      "fcf": "25568000000.0",
+      "shares_diluted": "7465000000.0",
+      "total_assets": "619003000000.0",
+      "total_debt": "60588000000.0",
+      "cash": "30242000000.0"
+    }
+  ],
+  "provenance": {
+    "source": "FMP",
+    "fetched_at": "2025-10-05T11:02:10.713823",
+    "meta": {
+      "endpoint": "financial-statements",
+      "period": "quarterly"
+    }
+  }
+}

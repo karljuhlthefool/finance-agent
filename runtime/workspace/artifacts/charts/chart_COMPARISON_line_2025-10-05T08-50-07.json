@@ -1,0 +1,118 @@
+{
+  "type": "line",
+  "data": [
+    {
+      "x": "2020",
+      "y": 24.54,
+      "label": "Apple"
+    },
+    {
+      "x": "2021",
+      "y": 33.07,
+      "label": "Apple"
+    },
+    {
+      "x": "2022",
+      "y": 7.87,
+      "label": "Apple"
+    },
+    {
+      "x": "2023",
+      "y": -2.24,
+      "label": "Apple"
+    },
+    {
+      "x": "2020",
+      "y": 6.55,
+      "label": "Microsoft"
+    },
+    {
+      "x": "2021",
+      "y": 20.55,
+      "label": "Microsoft"
+    },
+    {
+      "x": "2022",
+      "y": 10.73,
+      "label": "Microsoft"
+    },
+    {
+      "x": "2023",
+      "y": 10.18,
+      "label": "Microsoft"
+    },
+    {
+      "x": "2020",
+      "y": 110.87,
+      "label": "Google"
+    },
+    {
+      "x": "2021",
+      "y": 44.32,
+      "label": "Google"
+    },
+    {
+      "x": "2022",
+      "y": 7.35,
+      "label": "Google"
+    },
+    {
+      "x": "2023",
+      "y": 8.69,
+      "label": "Google"
+    },
+    {
+      "x": "2020",
+      "y": 145.26,
+      "label": "Amazon"
+    },
+    {
+      "x": "2021",
+      "y": 21.68,
+      "label": "Amazon"
+    },
+    {
+      "x": "2022",
+      "y": 9.42,
+      "label": "Amazon"
+    },
+    {
+      "x": "2023",
+      "y": 11.81,
+      "label": "Amazon"
+    },
+    {
+      "x": "2020",
+      "y": 124.02,
+      "label": "Meta"
+    },
+    {
+      "x": "2021",
+      "y": 35.96,
+      "label": "Meta"
+    },
+    {
+      "x": "2022",
+      "y": -1.14,
+      "label": "Meta"
+    },
+    {
+      "x": "2023",
+      "y": 22.55,
+      "label": "Meta"
+    }
+  ],
+  "title": "5-Year Annual Revenue Growth Comparison",
+  "xLabel": "Year",
+  "yLabel": "Growth Rate (%)",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

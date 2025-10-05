@@ -1,0 +1,34 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "Revenue Growth",
+      "y": 4.5
+    },
+    {
+      "x": "Earnings Growth",
+      "y": 59.0
+    },
+    {
+      "x": "Net Margin",
+      "y": 24.9
+    },
+    {
+      "x": "ROE",
+      "y": 35.6
+    }
+  ],
+  "title": "Apple Key Performance Metrics (%)",
+  "xLabel": "Metric",
+  "yLabel": "Percentage",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

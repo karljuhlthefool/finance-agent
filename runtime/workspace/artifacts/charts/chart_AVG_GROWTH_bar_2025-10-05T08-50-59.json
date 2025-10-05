@@ -1,0 +1,38 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "Microsoft",
+      "y": 12.0
+    },
+    {
+      "x": "Apple",
+      "y": 15.81
+    },
+    {
+      "x": "Meta",
+      "y": 45.35
+    },
+    {
+      "x": "Google",
+      "y": 42.81
+    },
+    {
+      "x": "Amazon",
+      "y": 47.04
+    }
+  ],
+  "title": "Average Annual Revenue Growth Rate (2020-2023)",
+  "xLabel": "Company",
+  "yLabel": "Average Growth Rate (%)",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

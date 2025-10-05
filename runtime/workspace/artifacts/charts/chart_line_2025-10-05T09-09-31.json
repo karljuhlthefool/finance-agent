@@ -1,0 +1,78 @@
+{
+  "type": "line",
+  "data": [
+    {
+      "x": "Q3 2024",
+      "y": 25.18,
+      "series": "Tesla"
+    },
+    {
+      "x": "Q4 2024",
+      "y": 25.71,
+      "series": "Tesla"
+    },
+    {
+      "x": "Q1 2025",
+      "y": 19.34,
+      "series": "Tesla"
+    },
+    {
+      "x": "Q2 2025",
+      "y": 22.5,
+      "series": "Tesla"
+    },
+    {
+      "x": "Q3 2024",
+      "y": 0.87,
+      "series": "Rivian"
+    },
+    {
+      "x": "Q4 2024",
+      "y": 1.73,
+      "series": "Rivian"
+    },
+    {
+      "x": "Q1 2025",
+      "y": 1.24,
+      "series": "Rivian"
+    },
+    {
+      "x": "Q2 2025",
+      "y": 1.3,
+      "series": "Rivian"
+    },
+    {
+      "x": "Q3 2024",
+      "y": 0.2,
+      "series": "Lucid"
+    },
+    {
+      "x": "Q4 2024",
+      "y": 0.23,
+      "series": "Lucid"
+    },
+    {
+      "x": "Q1 2025",
+      "y": 0.24,
+      "series": "Lucid"
+    },
+    {
+      "x": "Q2 2025",
+      "y": 0.26,
+      "series": "Lucid"
+    }
+  ],
+  "title": "EV Quarterly Revenue Trends (2024-2025)",
+  "xLabel": "Quarter",
+  "yLabel": "Revenue ($B)",
+  "seriesName": "Company",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

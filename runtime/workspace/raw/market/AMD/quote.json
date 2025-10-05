@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "AMD",
+    "name": "Advanced Micro Devices, Inc.",
+    "price": 164.67,
+    "changesPercentage": -2.98121,
+    "change": -5.06,
+    "dayLow": 163.14,
+    "dayHigh": 170.68,
+    "yearHigh": 186.65,
+    "yearLow": 76.48,
+    "marketCap": 267233670268,
+    "priceAvg50": 166.0118,
+    "priceAvg200": 128.01775,
+    "exchange": "NASDAQ",
+    "volume": 41106048,
+    "avgVolume": 53476425,
+    "open": 170.68,
+    "previousClose": 169.73,
+    "eps": 1.66,
+    "pe": 99.2,
+    "earningsAnnouncement": "2025-11-04T20:00:00.000+0000",
+    "sharesOutstanding": 1622843689,
+    "timestamp": 1759521601
+  }
+]

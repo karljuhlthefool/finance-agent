@@ -1,0 +1,38 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "Microsoft",
+      "y": 5.36
+    },
+    {
+      "x": "Apple",
+      "y": 15.52
+    },
+    {
+      "x": "Google",
+      "y": 46.43
+    },
+    {
+      "x": "Meta",
+      "y": 54.03
+    },
+    {
+      "x": "Amazon",
+      "y": 59.87
+    }
+  ],
+  "title": "Revenue Growth Volatility Comparison (Standard Deviation)",
+  "xLabel": "Company",
+  "yLabel": "Standard Deviation of Growth Rate (%)",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "number"
+}

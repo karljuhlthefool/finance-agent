@@ -1,0 +1,23 @@
+{
+  "ticker": "GOOGL",
+  "fields": [
+    "quote",
+    "fundamentals",
+    "key_metrics",
+    "profile"
+  ],
+  "range": "1y",
+  "period": "quarter",
+  "limit": 1,
+  "fetched_at": "2025-10-05T13:02:15.981999",
+  "provenance": [
+    {
+      "source": "FMP",
+      "fetched_at": "2025-10-05T11:02:14.203048",
+      "meta": {
+        "endpoint": "financial-statements",
+        "period": "quarterly"
+      }
+    }
+  ]
+}

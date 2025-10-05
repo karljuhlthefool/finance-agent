@@ -1,0 +1,26 @@
+{
+  "ticker": "GOOGL",
+  "currency": "USD",
+  "pit": true,
+  "quarters": [
+    {
+      "period_end": "2025-06-30",
+      "revenue": "96428000000.0",
+      "net_income": "28196000000.0",
+      "ocf": "27747000000.0",
+      "fcf": "5301000000.0",
+      "shares_diluted": "12198000000.0",
+      "total_assets": "502053000000.0",
+      "total_debt": "41668000000.0",
+      "cash": "21036000000.0"
+    }
+  ],
+  "provenance": {
+    "source": "FMP",
+    "fetched_at": "2025-10-05T11:02:14.203048",
+    "meta": {
+      "endpoint": "financial-statements",
+      "period": "quarterly"
+    }
+  }
+}

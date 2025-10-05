@@ -1,0 +1,30 @@
+{
+  "type": "bar",
+  "data": [
+    {
+      "x": "AAPL",
+      "y": 24.92
+    },
+    {
+      "x": "MSFT",
+      "y": 35.62
+    },
+    {
+      "x": "GOOGL",
+      "y": 29.24
+    }
+  ],
+  "title": "Tech Giants - Quarterly Net Income Margin",
+  "xLabel": "Company",
+  "yLabel": "Net Income Margin",
+  "seriesName": "Series 1",
+  "colors": [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4"
+  ],
+  "formatY": "percent"
+}

@@ -91,9 +91,13 @@ export default function Page() {
             metadata: event.metadata
           })
           
+          // Extract description from tool args (for Bash tool) or use last agent text as fallback
+          const toolDescription = event.args?.description || lastAgentTextRef.current || undefined
+          
           console.log('  🎯 ATTACHING DESCRIPTION:', {
-            lastAgentText: lastAgentTextRef.current,
-            willAttach: !!lastAgentTextRef.current
+            fromToolArgs: event.args?.description,
+            fromLastText: lastAgentTextRef.current,
+            willUse: toolDescription
           })
           
           addTool(event.tool_id, {
@@ -101,11 +105,11 @@ export default function Page() {
             cliTool: event.cli_tool,
             metadata: event.metadata,
             args: event.args,
-            description: lastAgentTextRef.current || undefined, // Attach description if we have one
+            description: toolDescription,
             phase: 'intent',
           })
           
-          console.log('  ✅ Tool added with description:', lastAgentTextRef.current ? `"${lastAgentTextRef.current}"` : '(none)')
+          console.log('  ✅ Tool added with description:', toolDescription ? `"${toolDescription}"` : '(none)')
           
           // Clear description after using it
           lastAgentTextRef.current = null

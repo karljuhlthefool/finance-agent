@@ -1,0 +1,107 @@
+{
+  "query_start": "2025-10-05T09:04:10.981759",
+  "query_end": "2025-10-05T09:04:16.671273",
+  "duration_ms": 5689,
+  "tool_count": 0,
+  "turn_count": 1,
+  "total_input_tokens": 3,
+  "total_output_tokens": 13,
+  "total_cost_usd": 0.0074558,
+  "events": [
+    {
+      "timestamp": "2025-10-05T09:04:10.981772",
+      "elapsed_ms": 0,
+      "type": "query_start",
+      "data": {
+        "prompt": "What is 5 + 7?",
+        "model": "sonnet"
+      }
+    },
+    {
+      "timestamp": "2025-10-05T09:04:12.908299",
+      "elapsed_ms": 1926,
+      "type": "system_message",
+      "data": {
+        "subtype": "init",
+        "data": {
+          "type": "system",
+          "subtype": "init",
+          "cwd": "/Users/karl/work/claude_finance_py/runtime/workspace",
+          "session_id": "3d163305-a971-41f2-aec8-d8dcf738d1fa",
+          "tools": [
+            "Task",
+            "Bash",
+            "Glob",
+            "Grep",
+            "ExitPlanMode",
+            "Read",
+            "Edit",
+            "Write",
+            "NotebookEdit",
+            "WebFetch",
+            "TodoWrite",
+            "WebSearch",
+            "BashOutput",
+            "KillShell",
+            "SlashCommand"
+          ],
+          "mcp_servers": [],
+          "model": "claude-sonnet-4-5-20250929",
+          "permissionMode": "bypassPermissions",
+          "slash_commands": [
+            "compact",
+            "context",
+            "cost",
+            "init",
+            "output-style:new",
+            "pr-comments",
+            "release-notes",
+            "todos",
+            "review",
+            "security-review"
+          ],
+          "apiKeySource": "ANTHROPIC_API_KEY",
+          "output_style": "default",
+          "agents": [
+            "general-purpose",
+            "statusline-setup",
+            "output-style-setup"
+          ],
+          "uuid": "4a18b304-3c8f-4df0-a8a1-506d40348256"
+        }
+      }
+    },
+    {
+      "timestamp": "2025-10-05T09:04:15.915729",
+      "elapsed_ms": 4933,
+      "type": "agent_text",
+      "data": {
+        "text": "5 + 7 = 12"
+      }
+    },
+    {
+      "timestamp": "2025-10-05T09:04:15.934290",
+      "elapsed_ms": 4952,
+      "type": "query_complete",
+      "data": {
+        "summary": "5 + 7 = 12",
+        "usage": {
+          "input_tokens": 3,
+          "cache_creation_input_tokens": 470,
+          "cache_read_input_tokens": 17399,
+          "output_tokens": 13,
+          "server_tool_use": {
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 470
+          }
+        },
+        "cost_usd": 0.0074558,
+        "runtime_ms": null
+      }
+    }
+  ]
+}

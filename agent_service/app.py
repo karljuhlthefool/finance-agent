@@ -276,8 +276,13 @@ async def _convert_message_to_events(message: Any) -> AsyncIterator[Dict[str, An
                 })
                 
                 # For CLI tools, use metadata (which has parsed JSON args) as args
-                # For other tools, use tool_args directly
-                display_args = metadata if cli_tool else tool_args
+                # But preserve the description parameter from tool_args if present
+                if cli_tool and metadata:
+                    display_args = metadata.copy()
+                    if "description" in tool_args:
+                        display_args["description"] = tool_args["description"]
+                else:
+                    display_args = tool_args
                 
                 yield {
                     "type": "data",

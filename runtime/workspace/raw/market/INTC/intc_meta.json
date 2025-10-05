@@ -1,0 +1,11 @@
+{
+  "ticker": "INTC",
+  "fields": [
+    "key_metrics"
+  ],
+  "range": "1y",
+  "period": "quarterly",
+  "limit": 12,
+  "fetched_at": "2025-10-05T09:00:58.529961",
+  "provenance": []
+}
